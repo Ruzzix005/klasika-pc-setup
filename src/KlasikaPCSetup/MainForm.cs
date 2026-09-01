@@ -10,10 +10,10 @@ public sealed class MainForm : Form
     private readonly CheckBox chrome = NewOption("Namesti ali posodobi Google Chrome");
     private readonly CheckBox sevenZip = NewOption("Namesti ali posodobi 7-Zip");
     private readonly CheckBox adobe = NewOption("Namesti ali posodobi Adobe Acrobat Reader (64-bit)");
-    private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt Klasika - visoka ucinkovitost");
+    private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt ReadyForge - visoka ucinkovitost");
     private readonly CheckBox devicePower = NewOption("Izklopi varcevanje USB in aktivnih mreznih kartic");
     private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
-    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Charcoal, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.None, Font = new Font("Consolas", 9) };
+    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Background, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Button start = new() { Text = "ZACNI", Width = 145, Height = 42 };
     private readonly Button cancel = new() { Text = "PREKLICI", Width = 125, Height = 42, Enabled = false };
@@ -22,41 +22,49 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Klasika PC Setup 2.0";
-        ClientSize = new Size(760, 680);
+        Text = "ReadyForge 2.0";
+        ClientSize = new Size(940, 760);
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         BackColor = AppTheme.Background;
         Font = new Font("Segoe UI", 10);
 
-        var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "KlasikaPCSetup", "Logs");
+        var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ReadyForge", "Logs");
         Directory.CreateDirectory(logDirectory);
-        logPath = Path.Combine(logDirectory, $"Klasika-PC-Setup-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        logPath = Path.Combine(logDirectory, $"ReadyForge-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
-        var header = new Panel { Location = Point.Empty, Size = new Size(760, 92), BackColor = AppTheme.Charcoal };
-        var accent = new Panel { Location = Point.Empty, Size = new Size(8, 92), BackColor = AppTheme.Accent };
-        var title = new Label { Text = "Klasika PC Setup", Font = new Font("Segoe UI Semibold", 20), ForeColor = Color.White, AutoSize = true, Location = new Point(26, 15) };
-        var subtitle = new Label { Text = "Hitra priprava Windows racunalnika", ForeColor = Color.FromArgb(190, 190, 190), AutoSize = true, Location = new Point(29, 57) };
-        header.Controls.AddRange([accent, title, subtitle]);
-        var group = new GroupBox { Text = "  IZBOR OPRAVIL  ", ForeColor = AppTheme.Charcoal, BackColor = AppTheme.Surface, Location = new Point(24, 112), Size = new Size(710, 220), Padding = new Padding(14) };
+        var header = new Panel { Location = Point.Empty, Size = new Size(940, 128), BackColor = AppTheme.Charcoal };
+        var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 29), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(34, 28), Size = new Size(62, 62) };
+        var title = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 28), ForeColor = Color.White, AutoSize = true, Location = new Point(116, 25) };
+        var version = new Label { Text = "2.0", Font = new Font("Segoe UI Semibold", 10), ForeColor = Color.White, BackColor = AppTheme.Accent, AutoSize = true, Padding = new Padding(7, 4, 7, 4), Location = new Point(322, 38) };
+        var subtitle = new Label { Text = "Hitra priprava Windows racunalnika", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(119, 78) };
+        var utility = new Label { Text = "WINDOWS DEPLOYMENT UTILITY", Font = new Font("Segoe UI Semibold", 9), ForeColor = AppTheme.Accent, AutoSize = true, Location = new Point(712, 55) };
+        var accent = new Panel { Location = new Point(0, 125), Size = new Size(940, 3), BackColor = AppTheme.Accent };
+        header.Controls.AddRange([logoTile, title, version, subtitle, utility, accent]);
+        var group = new ForgeCard { Location = new Point(34, 148), Size = new Size(872, 296) };
+        var groupTitle = new Label { Text = "IZBOR OPRAVIL", Font = new Font("Segoe UI Semibold", 14), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(28, 18) };
+        group.Controls.Add(groupTitle);
         var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup };
-        for (var i = 0; i < boxes.Length; i++) { boxes[i].Location = new Point(20, 30 + i * 32); group.Controls.Add(boxes[i]); }
+        for (var i = 0; i < boxes.Length; i++) { boxes[i].Location = new Point(30, 55 + i * 38); boxes[i].Width = 812; group.Controls.Add(boxes[i]); }
 
-        var selectAll = new CheckBox { Text = "Izberi vse", Checked = true, AutoSize = true, Font = new Font("Segoe UI Semibold", 10), Location = new Point(24, 345) };
+        var outputCard = new ForgeCard { Location = new Point(34, 462), Size = new Size(872, 190) };
+        var selectAll = new ForgeCheckBox { Text = "IZBERI VSE", Checked = true, Font = new Font("Segoe UI Semibold", 11.5f), ForeColor = AppTheme.AccentBright, Location = new Point(25, 12), Width = 250 };
         selectAll.CheckedChanged += (_, _) => { foreach (var box in boxes) box.Checked = selectAll.Checked; };
-        log.Location = new Point(24, 378); log.Size = new Size(710, 190); log.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        status.Location = new Point(24, 606);
-        cancel.Location = new Point(455, 594); start.Location = new Point(589, 594);
+        log.Location = new Point(25, 52); log.Size = new Size(822, 116);
+        outputCard.Controls.AddRange([selectAll, log]);
+        status.Location = new Point(50, 697);
+        cancel.Location = new Point(590, 681); start.Location = new Point(748, 681);
         AppTheme.PrimaryButton(start); AppTheme.SecondaryButton(cancel);
         start.Click += async (_, _) => await StartSetupAsync(boxes, selectAll);
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
 
-        Controls.AddRange([header, group, selectAll, log, status, cancel, start]);
+        Controls.AddRange([header, group, outputCard, status, cancel, start]);
+        Shown += (_, _) => AppTheme.ApplyDarkTitleBar(this);
         WriteLog("Program je pripravljen. Izberi opravila in klikni ZACNI.");
     }
 
-    private static CheckBox NewOption(string text) => new() { Text = text, Checked = true, AutoSize = true };
+    private static CheckBox NewOption(string text) => new ForgeCheckBox { Text = text, Checked = true };
 
     private async Task StartSetupAsync(CheckBox[] boxes, CheckBox selectAll)
     {
@@ -83,7 +91,7 @@ public sealed class MainForm : Form
                 catch (Exception ex) { failures.Add(task.Name); WriteLog($"{task.Name}: {ex.Message}", "ERROR"); }
             }
 
-            if (failures.Count == 0) { status.Text = "Vsa opravila so koncana."; WriteLog("Vsa izbrana opravila so bila uspesno koncana.", "OK"); MessageBox.Show("Klasika je uspesno pripravljena.", Text); }
+            if (failures.Count == 0) { status.Text = "Vsa opravila so koncana."; WriteLog("Vsa izbrana opravila so bila uspesno koncana.", "OK"); MessageBox.Show("Racunalnik je uspesno pripravljen.", Text); }
             else { status.Text = "Koncano z napakami - preveri dnevnik."; MessageBox.Show("Napake:\n- " + string.Join("\n- ", failures), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
         catch (OperationCanceledException) { status.Text = "Izvajanje je bilo preklicano."; WriteLog("Izvajanje je bilo preklicano.", "WARN"); }
@@ -124,7 +132,7 @@ public sealed class MainForm : Form
     {
         WriteLog("Nastavljam nacrt porabe energije ...");
         var list = await RunCheckedAsync("powercfg.exe", ["/list"], false, ct);
-        var match = Regex.Match(list.Output, @"([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}).*Klasika - visoka ucinkovitost", RegexOptions.IgnoreCase);
+        var match = Regex.Match(list.Output, @"([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}).*(?:ReadyForge|Klasika) - visoka ucinkovitost", RegexOptions.IgnoreCase);
         string guid;
         if (match.Success) guid = match.Groups[1].Value;
         else
@@ -137,7 +145,7 @@ public sealed class MainForm : Form
             guid = guidMatch.Value;
         }
 
-        await RunCheckedAsync("powercfg.exe", ["/changename", guid, "Klasika - visoka ucinkovitost"], false, ct);
+        await RunCheckedAsync("powercfg.exe", ["/changename", guid, "ReadyForge - visoka ucinkovitost"], false, ct);
         await RunCheckedAsync("powercfg.exe", ["/setactive", guid], false, ct);
 
         // /change je na Windows 10/11 bolj zdruzljiv od lokaliziranih aliasov
