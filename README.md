@@ -21,6 +21,11 @@ Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim co
 - dnevnik v `C:\ProgramData\ReadyForge\Logs`.
 - pregled istega seznama kot `Nadzorna plosca > Programi in funkcije`,
 - rocna izbira programov za odstranitev z opozorili za gonilnike in OEM updaterje.
+- predhodni pregled modela, Windows, RAM-a, aktivacije, interneta in stanja ponovnega zagona,
+- prikaz stanja vsakega opravila in skupnega napredka,
+- preverjanje aktivnega nacrta, nastavitev `Nikoli` in izklopa Fast Startup,
+- iskanje in namestitev Windows posodobitev,
+- pregled naprav z manjkajocimi ali okvarjenimi gonilniki.
 
 ## Build
 
