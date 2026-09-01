@@ -6,13 +6,13 @@ namespace KlasikaPCSetup;
 internal static class AppTheme
 {
     internal static readonly Color Accent = Color.FromArgb(80, 175, 176);
-    internal static readonly Color AccentBright = Color.FromArgb(43, 207, 213);
-    internal static readonly Color Charcoal = Color.FromArgb(7, 12, 15);
-    internal static readonly Color Background = Color.FromArgb(5, 9, 12);
-    internal static readonly Color Surface = Color.FromArgb(9, 15, 18);
-    internal static readonly Color SurfaceRaised = Color.FromArgb(13, 21, 25);
-    internal static readonly Color Muted = Color.FromArgb(157, 166, 170);
-    internal static readonly Color Border = Color.FromArgb(51, 75, 79);
+    internal static readonly Color AccentBright = Color.FromArgb(100, 205, 206);
+    internal static readonly Color Charcoal = Color.FromArgb(8, 11, 14);
+    internal static readonly Color Background = Color.FromArgb(13, 17, 21);
+    internal static readonly Color Surface = Color.FromArgb(19, 24, 29);
+    internal static readonly Color SurfaceRaised = Color.FromArgb(24, 30, 36);
+    internal static readonly Color Muted = Color.FromArgb(142, 151, 160);
+    internal static readonly Color Border = Color.FromArgb(39, 47, 55);
 
     internal static void PrimaryButton(Button button) => StyleButton(button, Accent, Color.White, 0);
     internal static void SecondaryButton(Button button) => StyleButton(button, Surface, Color.WhiteSmoke, 1);
