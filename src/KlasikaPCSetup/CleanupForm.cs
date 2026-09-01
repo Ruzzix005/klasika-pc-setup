@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace KlasikaPCSetup;
@@ -8,6 +9,7 @@ public sealed class CleanupForm : Form
 {
     private readonly DataGridView grid = new();
     private readonly Button remove = new() { Text = "ODSTRANI IZBRANO", Width = 170, Height = 40 };
+    private readonly Button removeOffice = new() { Text = "ODSTRANI CEL OFFICE", Width = 180, Height = 40 };
     private readonly Button close = new() { Text = "ZAPRI", Width = 100, Height = 40 };
     private readonly Label status = new() { AutoSize = true, Text = "Berem seznam Programi in funkcije ..." };
     private CancellationTokenSource? removal;
@@ -33,10 +35,11 @@ public sealed class CleanupForm : Form
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Version", HeaderText = "Razlicica", ReadOnly = true, FillWeight = 30 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Note", HeaderText = "Opomba", ReadOnly = true, FillWeight = 40 });
 
-        status.Location = new Point(18, 542); remove.Location = new Point(623, 532); close.Location = new Point(802, 532);
+        status.Location = new Point(18, 542); removeOffice.Location = new Point(432, 532); remove.Location = new Point(621, 532); close.Location = new Point(800, 532);
         remove.Click += async (_, _) => await RemoveSelectedAsync();
+        removeOffice.Click += async (_, _) => await RemoveAllOfficeAsync();
         close.Click += (_, _) => { if (removal is null) Close(); else removal.Cancel(); };
-        Controls.AddRange([info, grid, status, remove, close]);
+        Controls.AddRange([info, grid, status, removeOffice, remove, close]);
         Shown += (_, _) => LoadPrograms();
     }
 
@@ -49,6 +52,7 @@ public sealed class CleanupForm : Form
             {
                 var row = grid.Rows[grid.Rows.Add(app.Recommended, app.Name, app.Publisher, app.Version, app.Note)];
                 row.Tag = app;
+                if (app.IsOffice) { row.Cells["Remove"].ReadOnly = true; row.DefaultCellStyle.BackColor = Color.AliceBlue; }
                 if (app.Protected) row.DefaultCellStyle.BackColor = Color.FromArgb(255, 248, 220);
             }
             status.Text = $"Najdenih programov: {apps.Count}. Rumeno oznaceni zahtevajo posebno previdnost.";
@@ -82,11 +86,12 @@ public sealed class CleanupForm : Form
 
                 var publisher = key.GetValue("Publisher")?.ToString()?.Trim() ?? "";
                 var version = key.GetValue("DisplayVersion")?.ToString()?.Trim() ?? "";
+                var isOffice = IsOffice(name, publisher);
                 var protectedApp = IsProtected(name, publisher);
-                var recommended = !protectedApp && IsRecommendedRemoval(name, publisher);
-                var note = protectedApp ? "PREVIDNO" : recommended ? "Predlagana odstranitev" : "";
+                var recommended = !isOffice && !protectedApp && IsRecommendedRemoval(name, publisher);
+                var note = isOffice ? "Uporabi gumb CEL OFFICE" : protectedApp ? "PREVIDNO" : recommended ? "Predlagana odstranitev" : "";
                 var id = $"{name}|{version}|{publisher}";
-                found.TryAdd(id, new InstalledProgram(name, publisher, version, command, recommended, protectedApp, note));
+                found.TryAdd(id, new InstalledProgram(name, publisher, version, command, recommended, protectedApp, isOffice, note));
             }
         }
         return found.Values;
@@ -96,11 +101,20 @@ public sealed class CleanupForm : Form
     {
         var text = $"{name} {publisher}";
         string[] patterns = [
-            "Microsoft 365", "Office 365", "Microsoft Office", "McAfee", "Norton", "WildTangent", "ExpressVPN",
+            "McAfee", "Norton", "WildTangent", "ExpressVPN",
             "Dropbox Promotion", "Booking.com", "Amazon", "Dell SupportAssist", "Dell Optimizer", "Dell Digital Delivery",
             "Dell Customer Connect", "HP Wolf Security", "HP JumpStarts", "Lenovo App Explorer"
         ];
         return patterns.Any(p => text.Contains(p, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsOffice(string name, string publisher)
+    {
+        if (!publisher.Contains("Microsoft", StringComparison.OrdinalIgnoreCase)) return false;
+        return name.Contains("Microsoft 365", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Office 365", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Microsoft Office", StringComparison.OrdinalIgnoreCase) ||
+               name.StartsWith("Microsoft OneNote -", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsProtected(string name, string publisher)
@@ -141,6 +155,56 @@ public sealed class CleanupForm : Form
         }
         status.Text = removal.IsCancellationRequested ? "Odstranjevanje je bilo preklicano." : $"Koncano. Neuspesnih: {failed}.";
         removal.Dispose(); removal = null; remove.Enabled = true; grid.Enabled = true; close.Text = "ZAPRI";
+    }
+
+    private async Task RemoveAllOfficeAsync()
+    {
+        if (MessageBox.Show("To bo z Microsoftovim uradnim pomocnikom odstranilo vse različice Office, Microsoft 365, Visio, Project in jezikovne pakete. Pred nadaljevanjem zapri Word, Excel, Outlook, Teams in druge Office programe. Nadaljujem?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+
+        removal = new CancellationTokenSource(); remove.Enabled = false; removeOffice.Enabled = false; grid.Enabled = false; close.Text = "PREKLICI";
+        var workDirectory = Path.Combine(Path.GetTempPath(), "KlasikaOfficeRemoval-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(workDirectory);
+            var zipPath = Path.Combine(workDirectory, "GetHelpCmd.zip");
+            status.Text = "Prenašam uradni Microsoft Get Help pomocnik ...";
+            using (var client = new HttpClient())
+            using (var response = await client.GetAsync("https://aka.ms/SaRA_EnterpriseVersionFiles", HttpCompletionOption.ResponseHeadersRead, removal.Token))
+            {
+                response.EnsureSuccessStatusCode();
+                await using var source = await response.Content.ReadAsStreamAsync(removal.Token);
+                await using var target = File.Create(zipPath);
+                await source.CopyToAsync(target, removal.Token);
+            }
+
+            status.Text = "Pripravljam Microsoft Office Uninstall pomocnik ...";
+            var extractPath = Path.Combine(workDirectory, "GetHelpCmd");
+            ZipFile.ExtractToDirectory(zipPath, extractPath);
+            var executable = Directory.GetFiles(extractPath, "GetHelpCmd.exe", SearchOption.AllDirectories).FirstOrDefault()
+                ?? throw new FileNotFoundException("GetHelpCmd.exe ni bil najden v Microsoftovem paketu.");
+
+            status.Text = "Odstranjujem celoten Office; to lahko traja vec minut ...";
+            var psi = new ProcessStartInfo(executable) { UseShellExecute = true };
+            psi.ArgumentList.Add("-S"); psi.ArgumentList.Add("OfficeScrubScenario"); psi.ArgumentList.Add("-AcceptEula"); psi.ArgumentList.Add("-OfficeVersion"); psi.ArgumentList.Add("All");
+            using var process = Process.Start(psi) ?? throw new InvalidOperationException("Microsoftovega pomocnika ni bilo mogoce zagnati.");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(removal.Token); timeout.CancelAfter(TimeSpan.FromMinutes(45));
+            try { await process.WaitForExitAsync(timeout.Token); }
+            catch (OperationCanceledException) { try { process.Kill(true); } catch { } throw; }
+
+            if (process.ExitCode == 0)
+            {
+                status.Text = "Office je odstranjen. Ponovno zazeni racunalnik.";
+                MessageBox.Show("Microsoftov pomocnik je odstranitev uspešno koncal. Za dokoncanje čiščenja ponovno zazeni racunalnik.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else throw new InvalidOperationException($"Microsoft Get Help je vrnil kodo {process.ExitCode}. Preveri njegovo CMD okno.");
+        }
+        catch (OperationCanceledException) { status.Text = "Odstranjevanje Office je bilo preklicano."; }
+        catch (Exception ex) { status.Text = "Office ni bil odstranjen: " + ex.Message; MessageBox.Show(status.Text, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        finally
+        {
+            try { if (Directory.Exists(workDirectory)) Directory.Delete(workDirectory, true); } catch { }
+            removal?.Dispose(); removal = null; remove.Enabled = true; removeOffice.Enabled = true; grid.Enabled = true; close.Text = "ZAPRI";
+        }
     }
 
     private static async Task<int> RunUninstallerAsync(string command, CancellationToken ct)
@@ -186,5 +250,5 @@ public sealed class CleanupForm : Form
         return process.ExitCode;
     }
 
-    private sealed record InstalledProgram(string Name, string Publisher, string Version, string UninstallCommand, bool Recommended, bool Protected, string Note);
+    private sealed record InstalledProgram(string Name, string Publisher, string Version, string UninstallCommand, bool Recommended, bool Protected, bool IsOffice, string Note);
 }
