@@ -168,11 +168,17 @@ public sealed class MainForm : Form
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         linked.CancelAfter(timeout);
-        var psi = new ProcessStartInfo(file) { UseShellExecute = false, CreateNoWindow = !interactive, RedirectStandardOutput = true, RedirectStandardError = true };
+        var psi = new ProcessStartInfo(file) {
+            UseShellExecute = false,
+            CreateNoWindow = !interactive,
+            RedirectStandardOutput = !interactive,
+            RedirectStandardError = !interactive
+        };
         foreach (var arg in args) psi.ArgumentList.Add(arg);
         using var process = new Process { StartInfo = psi };
         process.Start();
-        var outputTask = process.StandardOutput.ReadToEndAsync(); var errorTask = process.StandardError.ReadToEndAsync();
+        var outputTask = interactive ? Task.FromResult(string.Empty) : process.StandardOutput.ReadToEndAsync();
+        var errorTask = interactive ? Task.FromResult(string.Empty) : process.StandardError.ReadToEndAsync();
         try { await process.WaitForExitAsync(linked.Token); }
         catch (OperationCanceledException) { try { process.Kill(true); } catch { } throw; }
         return new ProcessResult(process.ExitCode, ((await outputTask) + Environment.NewLine + (await errorTask)).Trim());
