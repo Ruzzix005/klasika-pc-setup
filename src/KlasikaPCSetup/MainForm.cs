@@ -15,8 +15,8 @@ public sealed class MainForm : Form
     private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
     private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Background, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
-    private readonly Button start = new() { Text = "ZACNI", Width = 145, Height = 42 };
-    private readonly Button cancel = new() { Text = "PREKLICI", Width = 125, Height = 42, Enabled = false };
+    private readonly Button start = new() { Text = "ZAČNI   →", Width = 158, Height = 46 };
+    private readonly Button cancel = new() { Text = "×   PREKLIČI", Width = 142, Height = 46, Enabled = false };
     private CancellationTokenSource? currentRun;
     private readonly string logPath;
 
@@ -46,7 +46,14 @@ public sealed class MainForm : Form
         var groupTitle = new Label { Text = "IZBOR OPRAVIL", Font = new Font("Segoe UI Semibold", 14), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(28, 18) };
         group.Controls.Add(groupTitle);
         var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup };
-        for (var i = 0; i < boxes.Length; i++) { boxes[i].Location = new Point(30, 55 + i * 38); boxes[i].Width = 812; group.Controls.Add(boxes[i]); }
+        string[] rowMarks = ["WEB", "7Z", "PDF", "PERF", "USB", "DEL"];
+        for (var i = 0; i < boxes.Length; i++)
+        {
+            boxes[i].Location = new Point(30, 55 + i * 38); boxes[i].Width = 730; group.Controls.Add(boxes[i]);
+            var mark = new Label { Text = rowMarks[i], Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(780, 62 + i * 38), Size = new Size(55, 24) };
+            group.Controls.Add(mark);
+            if (i < boxes.Length - 1) group.Controls.Add(new Panel { BackColor = Color.FromArgb(24, 39, 43), Location = new Point(67, 92 + i * 38), Size = new Size(768, 1) });
+        }
 
         var outputCard = new ForgeCard { Location = new Point(34, 462), Size = new Size(872, 190) };
         var selectAll = new ForgeCheckBox { Text = "IZBERI VSE", Checked = true, Font = new Font("Segoe UI Semibold", 11.5f), ForeColor = AppTheme.AccentBright, Location = new Point(25, 12), Width = 250 };
@@ -54,7 +61,7 @@ public sealed class MainForm : Form
         log.Location = new Point(25, 52); log.Size = new Size(822, 116);
         outputCard.Controls.AddRange([selectAll, log]);
         status.Location = new Point(50, 697);
-        cancel.Location = new Point(590, 681); start.Location = new Point(748, 681);
+        cancel.Location = new Point(580, 678); start.Location = new Point(748, 678);
         AppTheme.PrimaryButton(start); AppTheme.SecondaryButton(cancel);
         start.Click += async (_, _) => await StartSetupAsync(boxes, selectAll);
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
