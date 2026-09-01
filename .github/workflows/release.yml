@@ -3,7 +3,14 @@ name: Build and publish latest EXE
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
+
+concurrency:
+  group: publish-latest
+  cancel-in-progress: true
 
 permissions:
   contents: write
