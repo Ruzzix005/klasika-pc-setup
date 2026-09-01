@@ -18,6 +18,8 @@ Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim co
 - izklop USB selective suspend in PCIe Link State Power Management,
 - izklop varcevanja na USB in aktivnih fizicnih mreznih karticah,
 - dnevnik v `C:\ProgramData\KlasikaPCSetup\Logs`.
+- pregled istega seznama kot `Nadzorna plosca > Programi in funkcije`,
+- rocna izbira programov za odstranitev z opozorili za gonilnike in OEM updaterje.
 
 ## Build
 
