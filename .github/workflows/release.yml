@@ -33,6 +33,6 @@ jobs:
         run: |
           gh release view latest 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create latest --target $env:GITHUB_SHA --title "Klasika PC Setup - latest" --notes "Samodejno izdelana najnovejsa razlicica za Windows 10/11 x64."
+            gh release create latest --target $env:GITHUB_SHA --title "ReadyForge - latest" --notes "Samodejno izdelana najnovejsa razlicica za Windows 10/11 x64."
           }
-          gh release upload latest publish/Klasika-PC-Setup.exe --clobber
+          gh release upload latest publish/ReadyForge.exe --clobber
