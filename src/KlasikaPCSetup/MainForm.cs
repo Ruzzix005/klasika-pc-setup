@@ -12,6 +12,7 @@ public sealed class MainForm : Form
     private readonly CheckBox adobe = NewOption("Namesti ali posodobi Adobe Acrobat Reader (64-bit)");
     private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt Klasika - visoka ucinkovitost");
     private readonly CheckBox devicePower = NewOption("Izklopi varcevanje USB in aktivnih mreznih kartic");
+    private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
     private readonly RichTextBox log = new() { ReadOnly = true, BackColor = Color.White, Font = new Font("Consolas", 9) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true };
     private readonly Button start = new() { Text = "ZACNI", Width = 145, Height = 42 };
@@ -36,7 +37,7 @@ public sealed class MainForm : Form
         var title = new Label { Text = "Klasika PC Setup", Font = new Font("Segoe UI Semibold", 20), AutoSize = true, Location = new Point(24, 18) };
         var subtitle = new Label { Text = "Izberi programe in sistemske nastavitve, nato klikni ZACNI.", ForeColor = Color.DimGray, AutoSize = true, Location = new Point(27, 60) };
         var group = new GroupBox { Text = "Izbor opravil", Location = new Point(24, 92), Size = new Size(710, 220) };
-        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower };
+        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup };
         for (var i = 0; i < boxes.Length; i++) { boxes[i].Location = new Point(20, 30 + i * 32); group.Controls.Add(boxes[i]); }
 
         var selectAll = new CheckBox { Text = "Izberi vse", Checked = true, AutoSize = true, Location = new Point(24, 325) };
@@ -67,6 +68,7 @@ public sealed class MainForm : Form
         if (adobe.Checked) tasks.Add(("Adobe Acrobat Reader", ct => InstallPackageAsync("Adobe.Acrobat.Reader.64-bit", "Adobe Acrobat Reader", ct)));
         if (powerPlan.Checked) tasks.Add(("Nacrt porabe energije", SetPowerPlanAsync));
         if (devicePower.Checked) tasks.Add(("Varcevanje naprav", DisableDevicePowerAsync));
+        if (cleanup.Checked) tasks.Add(("Odstranjevanje programov", ShowCleanupAsync));
 
         try
         {
@@ -145,6 +147,14 @@ public sealed class MainForm : Form
         const string script = "$ids=@(); $ids += Get-PnpDevice -Class USB -Status OK -ErrorAction SilentlyContinue | % InstanceId; $ids += Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ? Status -ne 'Disabled' | % PnPDeviceID; $p=Get-CimInstance -Namespace root/wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop; $n=0; foreach($id in ($ids|?{$_}|sort -Unique)){ $x=$id.Replace('\\','_'); $p|?{$_.InstanceName -like \"$x*\" -and $_.Enable}|%{Set-CimInstance -InputObject $_ -Property @{Enable=$false} -ErrorAction Stop|Out-Null;$n++} }; Write-Output $n";
         var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, ct);
         WriteLog($"Spremenjenih power-management vnosov: {result.Output.Trim()}.", "OK");
+    }
+
+    private Task ShowCleanupAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var dialog = new CleanupForm();
+        dialog.ShowDialog(this);
+        return Task.CompletedTask;
     }
 
     private async Task<ProcessResult> RunCheckedAsync(string file, IEnumerable<string> args, bool interactive, CancellationToken ct)
