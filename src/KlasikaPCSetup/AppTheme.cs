@@ -6,16 +6,25 @@ namespace KlasikaPCSetup;
 internal static class AppTheme
 {
     internal static readonly Color Accent = Color.FromArgb(80, 175, 176);
-    internal static readonly Color AccentBright = Color.FromArgb(100, 205, 206);
-    internal static readonly Color Charcoal = Color.FromArgb(8, 11, 14);
+    internal static readonly Color AccentBright = Color.FromArgb(101, 197, 198);
+    internal static readonly Color Charcoal = Color.FromArgb(9, 12, 15);
     internal static readonly Color Background = Color.FromArgb(13, 17, 21);
-    internal static readonly Color Surface = Color.FromArgb(19, 24, 29);
-    internal static readonly Color SurfaceRaised = Color.FromArgb(24, 30, 36);
-    internal static readonly Color Muted = Color.FromArgb(142, 151, 160);
-    internal static readonly Color Border = Color.FromArgb(39, 47, 55);
+    internal static readonly Color Surface = Color.FromArgb(21, 27, 32);
+    internal static readonly Color SurfaceRaised = Color.FromArgb(26, 34, 40);
+    internal static readonly Color Muted = Color.FromArgb(152, 165, 174);
+    internal static readonly Color Border = Color.FromArgb(41, 52, 60);
 
-    internal static void PrimaryButton(Button button) => StyleButton(button, Accent, Color.White, 0);
-    internal static void SecondaryButton(Button button) => StyleButton(button, Surface, Color.WhiteSmoke, 1);
+    internal static void PrimaryButton(Button button)
+    {
+        if (button is ForgeButton forge) forge.IsPrimary = true;
+        StyleButton(button, Accent, Color.White, 0);
+    }
+
+    internal static void SecondaryButton(Button button)
+    {
+        if (button is ForgeButton forge) forge.IsPrimary = false;
+        StyleButton(button, Surface, Color.WhiteSmoke, 1);
+    }
 
     private static void StyleButton(Button button, Color back, Color fore, int border)
     {
@@ -35,6 +44,48 @@ internal static class AppTheme
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+}
+
+internal sealed class ForgeButton : Button
+{
+    private bool hovered;
+    internal bool IsPrimary { get; set; }
+
+    internal ForgeButton()
+    {
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var rect = new Rectangle(1, 1, Width - 3, Height - 3);
+        using var path = RoundedRectangle(rect, 9);
+        var background = !Enabled ? AppTheme.SurfaceRaised : IsPrimary ? (hovered ? AppTheme.AccentBright : AppTheme.Accent) : (hovered ? AppTheme.SurfaceRaised : AppTheme.Surface);
+        using var brush = new SolidBrush(background);
+        e.Graphics.FillPath(brush, path);
+        if (!IsPrimary)
+        {
+            using var border = new Pen(Enabled ? AppTheme.Accent : AppTheme.Border);
+            e.Graphics.DrawPath(border, path);
+        }
+        var textColor = Enabled ? Color.White : Color.FromArgb(105, 116, 124);
+        TextRenderer.DrawText(e.Graphics, Text, Font, rect, textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+    }
+
+    private static GraphicsPath RoundedRectangle(Rectangle r, int radius)
+    {
+        var d = radius * 2; var path = new GraphicsPath();
+        path.AddArc(r.Left, r.Top, d, d, 180, 90); path.AddArc(r.Right - d, r.Top, d, d, 270, 90);
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); path.AddArc(r.Left, r.Bottom - d, d, d, 90, 90);
+        path.CloseFigure(); return path;
+    }
 }
 
 internal sealed class ForgeCard : Panel
