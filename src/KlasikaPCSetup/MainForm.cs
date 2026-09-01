@@ -7,14 +7,14 @@ namespace KlasikaPCSetup;
 public sealed class MainForm : Form
 {
     private const int NoApplicableUpdate = unchecked((int)0x8A15002B);
-    private readonly CheckBox chrome = NewOption("Namesti ali posodobi Google Chrome");
-    private readonly CheckBox sevenZip = NewOption("Namesti ali posodobi 7-Zip");
-    private readonly CheckBox adobe = NewOption("Namesti ali posodobi Adobe Acrobat Reader (64-bit)");
-    private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt ReadyForge - visoka ucinkovitost");
-    private readonly CheckBox devicePower = NewOption("Izklopi varcevanje USB in aktivnih mreznih kartic");
-    private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
-    private readonly CheckBox windowsUpdate = NewOption("Poisci in namesti Windows posodobitve");
-    private readonly CheckBox drivers = NewOption("Preveri naprave z manjkajocimi gonilniki");
+    private readonly CheckBox chrome = NewOption("Google Chrome");
+    private readonly CheckBox sevenZip = NewOption("7-Zip");
+    private readonly CheckBox adobe = NewOption("Adobe Acrobat Reader");
+    private readonly CheckBox powerPlan = NewOption("Visoka ucinkovitost in Fast Startup");
+    private readonly CheckBox devicePower = NewOption("USB in mrezne kartice");
+    private readonly CheckBox cleanup = NewOption("Odstranjevanje programov");
+    private readonly CheckBox windowsUpdate = NewOption("Windows Update");
+    private readonly CheckBox drivers = NewOption("Pregled gonilnikov");
     private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Background, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Button start = new() { Text = "ZAČNI   →", Width = 158, Height = 46 };
@@ -29,8 +29,8 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "ReadyForge 2.1";
-        ClientSize = new Size(1000, 920);
+        Text = "ReadyForge 2.2";
+        ClientSize = new Size(1120, 760);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -41,49 +41,62 @@ public sealed class MainForm : Form
         Directory.CreateDirectory(logDirectory);
         logPath = Path.Combine(logDirectory, $"ReadyForge-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
-        var header = new Panel { Location = Point.Empty, Size = new Size(1000, 128), BackColor = AppTheme.Charcoal };
-        var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 29), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(34, 28), Size = new Size(62, 62) };
-        var title = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 28), ForeColor = Color.White, AutoSize = true, Location = new Point(116, 25) };
-        var version = new Label { Text = "2.1", Font = new Font("Segoe UI Semibold", 10), ForeColor = Color.White, BackColor = AppTheme.Accent, AutoSize = true, Padding = new Padding(7, 4, 7, 4), Location = new Point(322, 38) };
-        var subtitle = new Label { Text = "Hitra priprava Windows racunalnika", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(119, 78) };
-        var utility = new Label { Text = "WINDOWS DEPLOYMENT UTILITY", Font = new Font("Segoe UI Semibold", 9), ForeColor = AppTheme.Accent, AutoSize = true, Location = new Point(772, 55) };
-        var accent = new Panel { Location = new Point(0, 125), Size = new Size(1000, 3), BackColor = AppTheme.Accent };
-        header.Controls.AddRange([logoTile, title, version, subtitle, utility, accent]);
+        var sidebar = new Panel { Location = Point.Empty, Size = new Size(218, 760), BackColor = AppTheme.Charcoal };
+        var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 22), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(24, 28), Size = new Size(48, 48) };
+        var brand = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 17), ForeColor = Color.White, AutoSize = true, Location = new Point(84, 31) };
+        var version = new Label { Text = "VERSION 2.2", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
+        var navTitle = new Label { Text = "DELOVNI PROSTOR", Font = new Font("Segoe UI Semibold", 8), ForeColor = Color.FromArgb(92, 103, 112), AutoSize = true, Location = new Point(24, 125) };
+        var activeNav = new Panel { Location = new Point(12, 151), Size = new Size(194, 46), BackColor = AppTheme.SurfaceRaised };
+        var activeLine = new Panel { Location = Point.Empty, Size = new Size(3, 46), BackColor = AppTheme.Accent };
+        var activeText = new Label { Text = "  Priprava racunalnika", Font = new Font("Segoe UI Semibold", 10), ForeColor = Color.White, AutoSize = true, Location = new Point(18, 13) };
+        activeNav.Controls.AddRange([activeLine, activeText]);
+        var section1 = new Label { Text = "01   Pregled sistema", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(30, 220) };
+        var section2 = new Label { Text = "02   Izbor opravil", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(30, 257) };
+        var section3 = new Label { Text = "03   Dnevnik izvajanja", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(30, 294) };
+        var github = new LinkLabel { Text = "GitHub repozitorij  ↗", LinkColor = AppTheme.AccentBright, ActiveLinkColor = Color.White, AutoSize = true, Location = new Point(27, 690) };
+        github.Click += (_, _) => Process.Start(new ProcessStartInfo("https://github.com/Ruzzix005/klasika-pc-setup") { UseShellExecute = true });
+        var sideNote = new Label { Text = "Windows 10 / 11  •  x64", ForeColor = Color.FromArgb(88, 99, 107), AutoSize = true, Location = new Point(27, 724) };
+        sidebar.Controls.AddRange([logoTile, brand, version, navTitle, activeNav, section1, section2, section3, github, sideNote]);
 
-        var systemCard = new ForgeCard { Location = new Point(34, 145), Size = new Size(932, 120) };
-        var systemTitle = new Label { Text = "PREGLED RACUNALNIKA", Font = new Font("Segoe UI Semibold", 12), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(25, 16) };
-        systemSummary.Text = "Berem podatke o racunalniku ..."; systemSummary.Location = new Point(25, 48); systemSummary.Size = new Size(880, 55);
-        systemCard.Controls.AddRange([systemTitle, systemSummary]);
+        var pageTitle = new Label { Text = "Priprava racunalnika", Font = new Font("Segoe UI Semibold", 25), ForeColor = Color.White, AutoSize = true, Location = new Point(252, 24) };
+        var pageSubtitle = new Label { Text = "Izberi opravila in spremljaj potek priprave sistema.", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(255, 65) };
 
-        var group = new ForgeCard { Location = new Point(34, 280), Size = new Size(932, 360) };
-        var groupTitle = new Label { Text = "IZBOR OPRAVIL", Font = new Font("Segoe UI Semibold", 14), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(28, 18) };
-        group.Controls.Add(groupTitle);
+        var systemCard = new ForgeCard { Location = new Point(252, 98), Size = new Size(834, 92) };
+        var systemBadge = new Label { Text = "PC", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 10), ForeColor = AppTheme.AccentBright, BackColor = AppTheme.SurfaceRaised, Location = new Point(20, 20), Size = new Size(52, 52) };
+        var systemTitle = new Label { Text = "Ta racunalnik", Font = new Font("Segoe UI Semibold", 11), ForeColor = Color.White, AutoSize = true, Location = new Point(91, 17) };
+        systemSummary.Text = "Berem podatke o racunalniku ..."; systemSummary.Location = new Point(91, 42); systemSummary.Size = new Size(720, 40);
+        systemCard.Controls.AddRange([systemBadge, systemTitle, systemSummary]);
+
+        var groupTitle = new Label { Text = "Opravila", Font = new Font("Segoe UI Semibold", 16), ForeColor = Color.White, AutoSize = true, Location = new Point(252, 211) };
         var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup, windowsUpdate, drivers };
-        string[] rowMarks = ["WEB", "7Z", "PDF", "PERF", "USB", "DEL", "WU", "DRV"];
         for (var i = 0; i < boxes.Length; i++)
         {
-            boxes[i].Location = new Point(30, 51 + i * 37); boxes[i].Width = 710; group.Controls.Add(boxes[i]);
-            var state = new Label { Text = "CAKA", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.Muted, TextAlign = ContentAlignment.MiddleRight, Location = new Point(745, 58 + i * 37), Size = new Size(95, 24) };
-            taskStates[boxes[i]] = state; group.Controls.Add(state);
-            var mark = new Label { Text = rowMarks[i], Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(850, 58 + i * 37), Size = new Size(55, 24) };
-            group.Controls.Add(mark);
-            if (i < boxes.Length - 1) group.Controls.Add(new Panel { BackColor = Color.FromArgb(24, 39, 43), Location = new Point(67, 87 + i * 37), Size = new Size(838, 1) });
+            var column = i % 2; var row = i / 2;
+            var tile = new ForgeCard { Location = new Point(252 + column * 421, 250 + row * 65), Size = new Size(405, 54) };
+            boxes[i].Location = new Point(15, 8); boxes[i].Width = 300; boxes[i].Height = 38; tile.Controls.Add(boxes[i]);
+            var state = new Label { Text = "CAKA", Font = new Font("Segoe UI Semibold", 7.5f), ForeColor = AppTheme.Muted, TextAlign = ContentAlignment.MiddleRight, Location = new Point(316, 15), Size = new Size(70, 24) };
+            taskStates[boxes[i]] = state; tile.Controls.Add(state); Controls.Add(tile);
         }
 
-        var outputCard = new ForgeCard { Location = new Point(34, 655), Size = new Size(932, 180) };
-        var selectAll = new ForgeCheckBox { Text = "IZBERI VSE", Checked = true, Font = new Font("Segoe UI Semibold", 11.5f), ForeColor = AppTheme.AccentBright, Location = new Point(25, 12), Width = 250 };
+        var selectAll = new ForgeCheckBox { Text = "Izberi vse", Checked = true, Font = new Font("Segoe UI Semibold", 10), ForeColor = AppTheme.AccentBright, Location = new Point(940, 207), Width = 145 };
         selectAll.CheckedChanged += (_, _) => { foreach (var box in boxes) box.Checked = selectAll.Checked; };
-        progressText.Location = new Point(850, 19);
-        progressTrack.Location = new Point(285, 32); progressTrack.Width = 540; progressTrack.Controls.Add(progressFill);
-        log.Location = new Point(25, 52); log.Size = new Size(882, 106);
-        outputCard.Controls.AddRange([selectAll, progressTrack, progressText, log]);
-        status.Location = new Point(50, 868);
-        cancel.Location = new Point(640, 850); start.Location = new Point(808, 850);
+
+        var outputCard = new ForgeCard { Location = new Point(252, 525), Size = new Size(834, 130) };
+        var outputTitle = new Label { Text = "Dnevnik izvajanja", Font = new Font("Segoe UI Semibold", 11), ForeColor = Color.White, AutoSize = true, Location = new Point(18, 14) };
+        progressText.Location = new Point(775, 16);
+        progressTrack.Location = new Point(540, 26); progressTrack.Width = 215; progressTrack.Controls.Add(progressFill);
+        log.Location = new Point(18, 46); log.Size = new Size(798, 66);
+        outputCard.Controls.AddRange([outputTitle, progressTrack, progressText, log]);
+
+        var footer = new Panel { Location = new Point(218, 680), Size = new Size(902, 80), BackColor = Color.FromArgb(10, 14, 18) };
+        status.Location = new Point(34, 31);
+        cancel.Location = new Point(572, 17); start.Location = new Point(738, 17);
         AppTheme.PrimaryButton(start); AppTheme.SecondaryButton(cancel);
         start.Click += async (_, _) => await StartSetupAsync(boxes, selectAll);
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
+        footer.Controls.AddRange([status, cancel, start]);
 
-        Controls.AddRange([header, systemCard, group, outputCard, status, cancel, start]);
+        Controls.AddRange([sidebar, pageTitle, pageSubtitle, systemCard, groupTitle, selectAll, outputCard, footer]);
         Shown += async (_, _) => { AppTheme.ApplyDarkTitleBar(this); await LoadSystemSummaryAsync(); };
         WriteLog("Program je pripravljen. Izberi opravila in klikni ZACNI.");
     }
