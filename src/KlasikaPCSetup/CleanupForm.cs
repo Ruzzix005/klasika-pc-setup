@@ -191,7 +191,12 @@ public sealed class CleanupForm : Form
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
-            psi.ArgumentList.Add("-S"); psi.ArgumentList.Add("OfficeScrubScenario"); psi.ArgumentList.Add("-AcceptEula"); psi.ArgumentList.Add("-OfficeVersion"); psi.ArgumentList.Add("All");
+            // Aktualni GetHelpCmd paket sam zazna namesceno razlicico Office.
+            // Nekatere izdaje kljub starejsi dokumentaciji ne podpirajo vec
+            // dodatnega stikala -OfficeVersion.
+            psi.ArgumentList.Add("-S");
+            psi.ArgumentList.Add("OfficeScrubScenario");
+            psi.ArgumentList.Add("-AcceptEula");
             using var process = Process.Start(psi) ?? throw new InvalidOperationException("Microsoftovega pomocnika ni bilo mogoce zagnati.");
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
