@@ -55,7 +55,7 @@ public sealed class CleanupForm : Form
         removeOffice.Click += async (_, _) => await RemoveAllOfficeAsync();
         close.Click += (_, _) => { if (removal is null) Close(); else removal.Cancel(); };
         Controls.AddRange([header, info, grid, status, removeOffice, remove, close]);
-        Shown += (_, _) => LoadPrograms();
+        Shown += (_, _) => { AppTheme.ApplyDarkTitleBar(this); LoadPrograms(); };
     }
 
     private void LoadPrograms()
