@@ -2,7 +2,7 @@
 
 Orodje za pripravo namiznih racunalnikov z Windows 10 ali Windows 11.
 
-Razlicica 2.2 uporablja kompaktno dashboard postavitev z dvostolpcnim izborom opravil in neposredno povezavo do GitHub repozitorija.
+Razlicica 2.3 uporablja kompaktno dashboard postavitev, uravnotezen kontrast in lastne zaobljene gumbe z odzivom ob prehodu miske.
 
 ## Prenos
 
