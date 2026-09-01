@@ -47,6 +47,7 @@ public sealed class CleanupForm : Form
     {
         try
         {
+            grid.Rows.Clear();
             var apps = ReadInstalledPrograms().OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
             foreach (var app in apps)
             {
@@ -184,19 +185,34 @@ public sealed class CleanupForm : Form
                 ?? throw new FileNotFoundException("GetHelpCmd.exe ni bil najden v Microsoftovem paketu.");
 
             status.Text = "Odstranjujem celoten Office; to lahko traja vec minut ...";
-            var psi = new ProcessStartInfo(executable) { UseShellExecute = true };
+            var psi = new ProcessStartInfo(executable) {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
             psi.ArgumentList.Add("-S"); psi.ArgumentList.Add("OfficeScrubScenario"); psi.ArgumentList.Add("-AcceptEula"); psi.ArgumentList.Add("-OfficeVersion"); psi.ArgumentList.Add("All");
             using var process = Process.Start(psi) ?? throw new InvalidOperationException("Microsoftovega pomocnika ni bilo mogoce zagnati.");
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(removal.Token); timeout.CancelAfter(TimeSpan.FromMinutes(45));
             try { await process.WaitForExitAsync(timeout.Token); }
             catch (OperationCanceledException) { try { process.Kill(true); } catch { } throw; }
 
-            if (process.ExitCode == 0)
+            var scenarioOutput = ((await outputTask) + Environment.NewLine + (await errorTask)).Trim();
+            var confirmedSuccess = Regex.IsMatch(scenarioOutput, @"(?m)^\s*00:\s*Successfully completed", RegexOptions.IgnoreCase);
+            if (confirmedSuccess)
             {
+                LoadPrograms();
                 status.Text = "Office je odstranjen. Ponovno zazeni racunalnik.";
                 MessageBox.Show("Microsoftov pomocnik je odstranitev uspešno koncal. Za dokoncanje čiščenja ponovno zazeni racunalnik.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            else throw new InvalidOperationException($"Microsoft Get Help je vrnil kodo {process.ExitCode}. Preveri njegovo CMD okno.");
+            else
+            {
+                var knownResult = Regex.Match(scenarioOutput, @"(?m)^\s*(06|08|09|10|66|67|68):[^\r\n]*");
+                var details = knownResult.Success ? knownResult.Value.Trim() : string.IsNullOrWhiteSpace(scenarioOutput) ? "Microsoftov pomocnik ni vrnil potrditve 00." : scenarioOutput;
+                throw new InvalidOperationException($"Office odstranitev ni potrjena (procesna koda {process.ExitCode}). {details}");
+            }
         }
         catch (OperationCanceledException) { status.Text = "Odstranjevanje Office je bilo preklicano."; }
         catch (Exception ex) { status.Text = "Office ni bil odstranjen: " + ex.Message; MessageBox.Show(status.Text, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
