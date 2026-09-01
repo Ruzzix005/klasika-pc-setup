@@ -1,10 +1,10 @@
-# Klasika PC Setup
+# ReadyForge
 
 Orodje za pripravo namiznih racunalnikov z Windows 10 ali Windows 11.
 
 ## Prenos
 
-[Prenesi najnovejsi Klasika-PC-Setup.exe](https://github.com/Ruzzix005/klasika-pc-setup/releases/latest/download/Klasika-PC-Setup.exe)
+[Prenesi najnovejsi ReadyForge.exe](https://github.com/Ruzzix005/klasika-pc-setup/releases/latest/download/ReadyForge.exe)
 
 Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim code-signing certifikatom, lahko Microsoft SmartScreen prikaze opozorilo.
 
@@ -13,12 +13,12 @@ Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim co
 - namestitev ali posodobitev Google Chrome,
 - namestitev ali posodobitev 7-Zip,
 - namestitev ali posodobitev Adobe Acrobat Reader 64-bit,
-- nacrt `Klasika - visoka ucinkovitost`,
+- nacrt `ReadyForge - visoka ucinkovitost`,
 - izklop spanja, hibernacije, ugašanja zaslona in diska,
 - izklop hitrega zagona (Fast Startup),
 - izklop USB selective suspend in PCIe Link State Power Management,
 - izklop varcevanja na USB in aktivnih fizicnih mreznih karticah,
-- dnevnik v `C:\ProgramData\KlasikaPCSetup\Logs`.
+- dnevnik v `C:\ProgramData\ReadyForge\Logs`.
 - pregled istega seznama kot `Nadzorna plosca > Programi in funkcije`,
 - rocna izbira programov za odstranitev z opozorili za gonilnike in OEM updaterje.
 
