@@ -97,13 +97,13 @@ public sealed class MainForm : Form
             throw new InvalidOperationException("winget ni namescen. Namesti App Installer iz Microsoft Store.");
 
         WriteLog($"Preverjam {name} ...");
-        var listed = await RunAsync("winget.exe", ["list", "--id", id, "-e", "--accept-source-agreements", "--disable-interactivity"], false, TimeSpan.FromMinutes(2), ct);
+        var listed = await RunAsync("winget.exe", ["list", "--id", id, "-e", "--source", "winget", "--accept-source-agreements", "--disable-interactivity"], false, TimeSpan.FromMinutes(2), ct);
         ProcessResult result;
         if (listed.ExitCode == 0)
         {
             WriteLog($"{name} je namescen; preverjam posodobitev.");
             status.Text = $"Preverjanje posodobitve: {name}";
-            result = await RunAsync("winget.exe", ["upgrade", "--id", id, "-e", "--interactive", "--accept-package-agreements", "--accept-source-agreements"], true, TimeSpan.FromMinutes(15), ct);
+            result = await RunAsync("winget.exe", ["upgrade", "--id", id, "-e", "--source", "winget", "--interactive", "--accept-package-agreements", "--accept-source-agreements"], true, TimeSpan.FromMinutes(15), ct);
             if (result.ExitCode == NoApplicableUpdate || result.Output.Contains("No available upgrade", StringComparison.OrdinalIgnoreCase) || result.Output.Contains("No newer package", StringComparison.OrdinalIgnoreCase))
             { WriteLog($"{name} je ze na najnovejsi verziji.", "OK"); return; }
         }
@@ -111,7 +111,7 @@ public sealed class MainForm : Form
         {
             WriteLog($"Namescam {name}; spremljaj namestitveno okno ...");
             status.Text = $"Namescanje: {name} - dokoncaj korake v installerju";
-            result = await RunAsync("winget.exe", ["install", "--id", id, "-e", "--interactive", "--accept-package-agreements", "--accept-source-agreements"], true, TimeSpan.FromMinutes(15), ct);
+            result = await RunAsync("winget.exe", ["install", "--id", id, "-e", "--source", "winget", "--interactive", "--accept-package-agreements", "--accept-source-agreements"], true, TimeSpan.FromMinutes(15), ct);
         }
         if (result.ExitCode != 0) throw new InvalidOperationException($"winget koda {result.ExitCode}. {result.Output}");
         WriteLog($"{name} je pripravljen.", "OK");
