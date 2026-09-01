@@ -17,29 +17,42 @@ public sealed class CleanupForm : Form
     public CleanupForm()
     {
         Text = "Pregled in odstranitev programov";
-        ClientSize = new Size(920, 590);
+        ClientSize = new Size(920, 640);
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9.5f);
         MinimizeBox = false;
+        BackColor = AppTheme.Background;
+
+        var header = new Panel { Location = Point.Empty, Size = new Size(920, 72), BackColor = AppTheme.Charcoal };
+        var accent = new Panel { Location = Point.Empty, Size = new Size(8, 72), BackColor = AppTheme.Accent };
+        var heading = new Label { Text = "Odstranjevanje programov", Font = new Font("Segoe UI Semibold", 18), ForeColor = Color.White, AutoSize = true, Location = new Point(24, 18) };
+        header.Controls.AddRange([accent, heading]);
 
         var info = new Label {
             Text = "Oznaci samo programe, ki jih res zelis odstraniti. Predizbrana sta znana navlaka in Office; gonilniki ter OEM updaterji niso.",
-            AutoSize = true, Location = new Point(18, 16)
+            AutoSize = true, ForeColor = AppTheme.Muted, Location = new Point(18, 88)
         };
-        grid.Location = new Point(18, 48); grid.Size = new Size(884, 470);
+        grid.Location = new Point(18, 120); grid.Size = new Size(884, 450);
         grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false; grid.RowHeadersVisible = false;
         grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect; grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        grid.BackgroundColor = AppTheme.Surface; grid.BorderStyle = BorderStyle.None; grid.GridColor = AppTheme.Border;
+        grid.EnableHeadersVisualStyles = false; grid.ColumnHeadersHeight = 36; grid.RowTemplate.Height = 30;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.Charcoal; grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.5f);
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 226, 218); grid.DefaultCellStyle.SelectionForeColor = AppTheme.Charcoal;
         grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Remove", HeaderText = "Odstrani", FillWeight = 18 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Name", HeaderText = "Program", ReadOnly = true, FillWeight = 100 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Publisher", HeaderText = "Izdajatelj", ReadOnly = true, FillWeight = 55 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Version", HeaderText = "Razlicica", ReadOnly = true, FillWeight = 30 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Note", HeaderText = "Opomba", ReadOnly = true, FillWeight = 40 });
 
-        status.Location = new Point(18, 542); removeOffice.Location = new Point(432, 532); remove.Location = new Point(621, 532); close.Location = new Point(800, 532);
+        status.Location = new Point(18, 598); status.ForeColor = AppTheme.Muted;
+        removeOffice.Location = new Point(432, 586); remove.Location = new Point(621, 586); close.Location = new Point(800, 586);
+        AppTheme.SecondaryButton(removeOffice); AppTheme.PrimaryButton(remove); AppTheme.SecondaryButton(close);
         remove.Click += async (_, _) => await RemoveSelectedAsync();
         removeOffice.Click += async (_, _) => await RemoveAllOfficeAsync();
         close.Click += (_, _) => { if (removal is null) Close(); else removal.Cancel(); };
-        Controls.AddRange([info, grid, status, removeOffice, remove, close]);
+        Controls.AddRange([header, info, grid, status, removeOffice, remove, close]);
         Shown += (_, _) => LoadPrograms();
     }
 
