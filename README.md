@@ -15,6 +15,7 @@ Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim co
 - namestitev ali posodobitev Adobe Acrobat Reader 64-bit,
 - nacrt `Klasika - visoka ucinkovitost`,
 - izklop spanja, hibernacije, ugašanja zaslona in diska,
+- izklop hitrega zagona (Fast Startup),
 - izklop USB selective suspend in PCIe Link State Power Management,
 - izklop varcevanja na USB in aktivnih fizicnih mreznih karticah,
 - dnevnik v `C:\ProgramData\KlasikaPCSetup\Logs`.
