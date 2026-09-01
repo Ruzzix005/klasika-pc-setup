@@ -145,9 +145,40 @@ public sealed class CleanupForm : Form
 
     private static async Task<int> RunUninstallerAsync(string command, CancellationToken ct)
     {
-        command = Regex.Replace(command, @"(?i)msiexec(?:\.exe)?\s+/I(?=\s*\{)", "msiexec.exe /X");
-        var psi = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = false };
-        psi.ArgumentList.Add("/d"); psi.ArgumentList.Add("/s"); psi.ArgumentList.Add("/c"); psi.ArgumentList.Add(command);
+        command = Environment.ExpandEnvironmentVariables(command.Trim());
+        ProcessStartInfo psi;
+
+        // Programi in funkcije pogosto shrani MSI ukaz kot /I, ki pomeni
+        // vzdrzevanje. Za odstranitev ga moramo zagnati kot /X.
+        var msi = Regex.Match(command, @"(?i)msiexec(?:\.exe)?\s+/(?:I|X)\s*(\{[0-9a-f-]+\})");
+        if (msi.Success)
+        {
+            psi = new ProcessStartInfo("msiexec.exe") { UseShellExecute = true };
+            psi.ArgumentList.Add("/x");
+            psi.ArgumentList.Add(msi.Groups[1].Value);
+        }
+        else
+        {
+            string executable;
+            string arguments;
+            if (command.StartsWith('"'))
+            {
+                var endQuote = command.IndexOf('"', 1);
+                if (endQuote < 2) throw new InvalidOperationException("Napacen UninstallString.");
+                executable = command[1..endQuote];
+                arguments = command[(endQuote + 1)..].Trim();
+            }
+            else
+            {
+                var exeEnd = command.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (exeEnd < 0) throw new InvalidOperationException("Pot do uninstallerja ni bila prepoznana.");
+                exeEnd += 4;
+                executable = command[..exeEnd].Trim();
+                arguments = command[exeEnd..].Trim();
+            }
+            psi = new ProcessStartInfo(executable) { UseShellExecute = true, Arguments = arguments };
+        }
+
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("Uninstallerja ni bilo mogoce zagnati.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromMinutes(20));
         try { await process.WaitForExitAsync(timeout.Token); }
