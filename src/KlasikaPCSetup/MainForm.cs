@@ -148,6 +148,18 @@ public sealed class MainForm : Form
         ];
         foreach (var command in required) await RunCheckedAsync("powercfg.exe", command, false, ct);
 
+        // Hiter zagon (Fast Startup) uporablja hiberboot tudi takrat, ko je
+        // nacrt porabe nastavljen na Nikoli. Izklopimo ga se eksplicitno.
+        await RunCheckedAsync("reg.exe", [
+            "add",
+            @"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power",
+            "/v", "HiberbootEnabled",
+            "/t", "REG_DWORD",
+            "/d", "0",
+            "/f"
+        ], false, ct);
+        WriteLog("Hiter zagon (Fast Startup) je izklopljen.", "OK");
+
         // Ti nastavitvi na nekaterih OEM/Modern Standby sistemih ne obstajata.
         // Uporabimo uradne GUID-e in nepodprto nastavitev obravnavamo kot opozorilo.
         string[][] optional = [
