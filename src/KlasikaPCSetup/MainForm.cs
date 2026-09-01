@@ -13,8 +13,8 @@ public sealed class MainForm : Form
     private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt Klasika - visoka ucinkovitost");
     private readonly CheckBox devicePower = NewOption("Izklopi varcevanje USB in aktivnih mreznih kartic");
     private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
-    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = Color.White, Font = new Font("Consolas", 9) };
-    private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true };
+    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Charcoal, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.None, Font = new Font("Consolas", 9) };
+    private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Button start = new() { Text = "ZACNI", Width = 145, Height = 42 };
     private readonly Button cancel = new() { Text = "PREKLICI", Width = 125, Height = 42, Enabled = false };
     private CancellationTokenSource? currentRun;
@@ -23,33 +23,36 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = "Klasika PC Setup 2.0";
-        ClientSize = new Size(760, 650);
+        ClientSize = new Size(760, 680);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        BackColor = Color.FromArgb(245, 247, 250);
+        BackColor = AppTheme.Background;
         Font = new Font("Segoe UI", 10);
 
         var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "KlasikaPCSetup", "Logs");
         Directory.CreateDirectory(logDirectory);
         logPath = Path.Combine(logDirectory, $"Klasika-PC-Setup-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
-        var title = new Label { Text = "Klasika PC Setup", Font = new Font("Segoe UI Semibold", 20), AutoSize = true, Location = new Point(24, 18) };
-        var subtitle = new Label { Text = "Izberi programe in sistemske nastavitve, nato klikni ZACNI.", ForeColor = Color.DimGray, AutoSize = true, Location = new Point(27, 60) };
-        var group = new GroupBox { Text = "Izbor opravil", Location = new Point(24, 92), Size = new Size(710, 220) };
+        var header = new Panel { Location = Point.Empty, Size = new Size(760, 92), BackColor = AppTheme.Charcoal };
+        var accent = new Panel { Location = Point.Empty, Size = new Size(8, 92), BackColor = AppTheme.Accent };
+        var title = new Label { Text = "Klasika PC Setup", Font = new Font("Segoe UI Semibold", 20), ForeColor = Color.White, AutoSize = true, Location = new Point(26, 15) };
+        var subtitle = new Label { Text = "Hitra priprava Windows racunalnika", ForeColor = Color.FromArgb(190, 190, 190), AutoSize = true, Location = new Point(29, 57) };
+        header.Controls.AddRange([accent, title, subtitle]);
+        var group = new GroupBox { Text = "  IZBOR OPRAVIL  ", ForeColor = AppTheme.Charcoal, BackColor = AppTheme.Surface, Location = new Point(24, 112), Size = new Size(710, 220), Padding = new Padding(14) };
         var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup };
         for (var i = 0; i < boxes.Length; i++) { boxes[i].Location = new Point(20, 30 + i * 32); group.Controls.Add(boxes[i]); }
 
-        var selectAll = new CheckBox { Text = "Izberi vse", Checked = true, AutoSize = true, Location = new Point(24, 325) };
+        var selectAll = new CheckBox { Text = "Izberi vse", Checked = true, AutoSize = true, Font = new Font("Segoe UI Semibold", 10), Location = new Point(24, 345) };
         selectAll.CheckedChanged += (_, _) => { foreach (var box in boxes) box.Checked = selectAll.Checked; };
-        log.Location = new Point(24, 356); log.Size = new Size(710, 190); log.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        status.Location = new Point(24, 570);
-        cancel.Location = new Point(455, 558); start.Location = new Point(589, 558);
-        start.BackColor = Color.FromArgb(0, 120, 215); start.ForeColor = Color.White; start.FlatStyle = FlatStyle.Flat;
+        log.Location = new Point(24, 378); log.Size = new Size(710, 190); log.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        status.Location = new Point(24, 606);
+        cancel.Location = new Point(455, 594); start.Location = new Point(589, 594);
+        AppTheme.PrimaryButton(start); AppTheme.SecondaryButton(cancel);
         start.Click += async (_, _) => await StartSetupAsync(boxes, selectAll);
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
 
-        Controls.AddRange([title, subtitle, group, selectAll, log, status, cancel, start]);
+        Controls.AddRange([header, group, selectAll, log, status, cancel, start]);
         WriteLog("Program je pripravljen. Izberi opravila in klikni ZACNI.");
     }
 
