@@ -2,6 +2,8 @@
 
 Orodje za pripravo namiznih racunalnikov z Windows 10 ali Windows 11.
 
+Razlicica 2.2 uporablja kompaktno dashboard postavitev z dvostolpcnim izborom opravil in neposredno povezavo do GitHub repozitorija.
+
 ## Prenos
 
 [Prenesi najnovejsi ReadyForge.exe](https://github.com/Ruzzix005/klasika-pc-setup/releases/latest/download/ReadyForge.exe)
