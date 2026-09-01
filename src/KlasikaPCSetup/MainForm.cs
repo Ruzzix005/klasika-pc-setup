@@ -15,10 +15,10 @@ public sealed class MainForm : Form
     private readonly CheckBox cleanup = NewOption("Odstranjevanje programov");
     private readonly CheckBox windowsUpdate = NewOption("Windows Update");
     private readonly CheckBox drivers = NewOption("Pregled gonilnikov");
-    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Background, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 9.5f) };
+    private readonly RichTextBox log = new() { ReadOnly = true, BackColor = Color.FromArgb(10, 14, 18), ForeColor = Color.FromArgb(218, 225, 229), BorderStyle = BorderStyle.None, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
-    private readonly Button start = new() { Text = "ZAČNI   →", Width = 158, Height = 46 };
-    private readonly Button cancel = new() { Text = "×   PREKLIČI", Width = 142, Height = 46, Enabled = false };
+    private readonly Button start = new ForgeButton { Text = "ZAČNI   →", Width = 158, Height = 46 };
+    private readonly Button cancel = new ForgeButton { Text = "×   PREKLIČI", Width = 142, Height = 46, Enabled = false };
     private readonly Label systemSummary = new() { AutoSize = false, ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9.5f) };
     private readonly Label progressText = new() { Text = "0 %", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Panel progressTrack = new() { BackColor = Color.FromArgb(26, 39, 43), Height = 5 };
@@ -29,7 +29,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "ReadyForge 2.2";
+        Text = "ReadyForge 2.3";
         ClientSize = new Size(1120, 760);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -44,7 +44,7 @@ public sealed class MainForm : Form
         var sidebar = new Panel { Location = Point.Empty, Size = new Size(218, 760), BackColor = AppTheme.Charcoal };
         var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 22), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(24, 28), Size = new Size(48, 48) };
         var brand = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 17), ForeColor = Color.White, AutoSize = true, Location = new Point(84, 31) };
-        var version = new Label { Text = "VERSION 2.2", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
+        var version = new Label { Text = "VERSION 2.3", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
         var navTitle = new Label { Text = "DELOVNI PROSTOR", Font = new Font("Segoe UI Semibold", 8), ForeColor = Color.FromArgb(92, 103, 112), AutoSize = true, Location = new Point(24, 125) };
         var activeNav = new Panel { Location = new Point(12, 151), Size = new Size(194, 46), BackColor = AppTheme.SurfaceRaised };
         var activeLine = new Panel { Location = Point.Empty, Size = new Size(3, 46), BackColor = AppTheme.Accent };
