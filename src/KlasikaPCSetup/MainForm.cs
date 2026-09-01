@@ -13,17 +13,24 @@ public sealed class MainForm : Form
     private readonly CheckBox powerPlan = NewOption("Ustvari in aktiviraj nacrt ReadyForge - visoka ucinkovitost");
     private readonly CheckBox devicePower = NewOption("Izklopi varcevanje USB in aktivnih mreznih kartic");
     private readonly CheckBox cleanup = NewOption("Preglej in odstrani programe iz Programi in funkcije");
+    private readonly CheckBox windowsUpdate = NewOption("Poisci in namesti Windows posodobitve");
+    private readonly CheckBox drivers = NewOption("Preveri naprave z manjkajocimi gonilniki");
     private readonly RichTextBox log = new() { ReadOnly = true, BackColor = AppTheme.Background, ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Button start = new() { Text = "ZAČNI   →", Width = 158, Height = 46 };
     private readonly Button cancel = new() { Text = "×   PREKLIČI", Width = 142, Height = 46, Enabled = false };
+    private readonly Label systemSummary = new() { AutoSize = false, ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9.5f) };
+    private readonly Label progressText = new() { Text = "0 %", AutoSize = true, ForeColor = AppTheme.Muted };
+    private readonly Panel progressTrack = new() { BackColor = Color.FromArgb(26, 39, 43), Height = 5 };
+    private readonly Panel progressFill = new() { BackColor = AppTheme.AccentBright, Height = 5, Width = 0 };
+    private readonly Dictionary<CheckBox, Label> taskStates = [];
     private CancellationTokenSource? currentRun;
     private readonly string logPath;
 
     public MainForm()
     {
-        Text = "ReadyForge 2.0";
-        ClientSize = new Size(940, 760);
+        Text = "ReadyForge 2.1";
+        ClientSize = new Size(1000, 920);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -34,44 +41,90 @@ public sealed class MainForm : Form
         Directory.CreateDirectory(logDirectory);
         logPath = Path.Combine(logDirectory, $"ReadyForge-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
-        var header = new Panel { Location = Point.Empty, Size = new Size(940, 128), BackColor = AppTheme.Charcoal };
+        var header = new Panel { Location = Point.Empty, Size = new Size(1000, 128), BackColor = AppTheme.Charcoal };
         var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 29), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(34, 28), Size = new Size(62, 62) };
         var title = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 28), ForeColor = Color.White, AutoSize = true, Location = new Point(116, 25) };
-        var version = new Label { Text = "2.0", Font = new Font("Segoe UI Semibold", 10), ForeColor = Color.White, BackColor = AppTheme.Accent, AutoSize = true, Padding = new Padding(7, 4, 7, 4), Location = new Point(322, 38) };
+        var version = new Label { Text = "2.1", Font = new Font("Segoe UI Semibold", 10), ForeColor = Color.White, BackColor = AppTheme.Accent, AutoSize = true, Padding = new Padding(7, 4, 7, 4), Location = new Point(322, 38) };
         var subtitle = new Label { Text = "Hitra priprava Windows racunalnika", ForeColor = AppTheme.Muted, AutoSize = true, Location = new Point(119, 78) };
-        var utility = new Label { Text = "WINDOWS DEPLOYMENT UTILITY", Font = new Font("Segoe UI Semibold", 9), ForeColor = AppTheme.Accent, AutoSize = true, Location = new Point(712, 55) };
-        var accent = new Panel { Location = new Point(0, 125), Size = new Size(940, 3), BackColor = AppTheme.Accent };
+        var utility = new Label { Text = "WINDOWS DEPLOYMENT UTILITY", Font = new Font("Segoe UI Semibold", 9), ForeColor = AppTheme.Accent, AutoSize = true, Location = new Point(772, 55) };
+        var accent = new Panel { Location = new Point(0, 125), Size = new Size(1000, 3), BackColor = AppTheme.Accent };
         header.Controls.AddRange([logoTile, title, version, subtitle, utility, accent]);
-        var group = new ForgeCard { Location = new Point(34, 148), Size = new Size(872, 296) };
+
+        var systemCard = new ForgeCard { Location = new Point(34, 145), Size = new Size(932, 120) };
+        var systemTitle = new Label { Text = "PREGLED RACUNALNIKA", Font = new Font("Segoe UI Semibold", 12), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(25, 16) };
+        systemSummary.Text = "Berem podatke o racunalniku ..."; systemSummary.Location = new Point(25, 48); systemSummary.Size = new Size(880, 55);
+        systemCard.Controls.AddRange([systemTitle, systemSummary]);
+
+        var group = new ForgeCard { Location = new Point(34, 280), Size = new Size(932, 360) };
         var groupTitle = new Label { Text = "IZBOR OPRAVIL", Font = new Font("Segoe UI Semibold", 14), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(28, 18) };
         group.Controls.Add(groupTitle);
-        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup };
-        string[] rowMarks = ["WEB", "7Z", "PDF", "PERF", "USB", "DEL"];
+        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup, windowsUpdate, drivers };
+        string[] rowMarks = ["WEB", "7Z", "PDF", "PERF", "USB", "DEL", "WU", "DRV"];
         for (var i = 0; i < boxes.Length; i++)
         {
-            boxes[i].Location = new Point(30, 55 + i * 38); boxes[i].Width = 730; group.Controls.Add(boxes[i]);
-            var mark = new Label { Text = rowMarks[i], Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(780, 62 + i * 38), Size = new Size(55, 24) };
+            boxes[i].Location = new Point(30, 51 + i * 37); boxes[i].Width = 710; group.Controls.Add(boxes[i]);
+            var state = new Label { Text = "CAKA", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.Muted, TextAlign = ContentAlignment.MiddleRight, Location = new Point(745, 58 + i * 37), Size = new Size(95, 24) };
+            taskStates[boxes[i]] = state; group.Controls.Add(state);
+            var mark = new Label { Text = rowMarks[i], Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(850, 58 + i * 37), Size = new Size(55, 24) };
             group.Controls.Add(mark);
-            if (i < boxes.Length - 1) group.Controls.Add(new Panel { BackColor = Color.FromArgb(24, 39, 43), Location = new Point(67, 92 + i * 38), Size = new Size(768, 1) });
+            if (i < boxes.Length - 1) group.Controls.Add(new Panel { BackColor = Color.FromArgb(24, 39, 43), Location = new Point(67, 87 + i * 37), Size = new Size(838, 1) });
         }
 
-        var outputCard = new ForgeCard { Location = new Point(34, 462), Size = new Size(872, 190) };
+        var outputCard = new ForgeCard { Location = new Point(34, 655), Size = new Size(932, 180) };
         var selectAll = new ForgeCheckBox { Text = "IZBERI VSE", Checked = true, Font = new Font("Segoe UI Semibold", 11.5f), ForeColor = AppTheme.AccentBright, Location = new Point(25, 12), Width = 250 };
         selectAll.CheckedChanged += (_, _) => { foreach (var box in boxes) box.Checked = selectAll.Checked; };
-        log.Location = new Point(25, 52); log.Size = new Size(822, 116);
-        outputCard.Controls.AddRange([selectAll, log]);
-        status.Location = new Point(50, 697);
-        cancel.Location = new Point(580, 678); start.Location = new Point(748, 678);
+        progressText.Location = new Point(850, 19);
+        progressTrack.Location = new Point(285, 32); progressTrack.Width = 540; progressTrack.Controls.Add(progressFill);
+        log.Location = new Point(25, 52); log.Size = new Size(882, 106);
+        outputCard.Controls.AddRange([selectAll, progressTrack, progressText, log]);
+        status.Location = new Point(50, 868);
+        cancel.Location = new Point(640, 850); start.Location = new Point(808, 850);
         AppTheme.PrimaryButton(start); AppTheme.SecondaryButton(cancel);
         start.Click += async (_, _) => await StartSetupAsync(boxes, selectAll);
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
 
-        Controls.AddRange([header, group, outputCard, status, cancel, start]);
-        Shown += (_, _) => AppTheme.ApplyDarkTitleBar(this);
+        Controls.AddRange([header, systemCard, group, outputCard, status, cancel, start]);
+        Shown += async (_, _) => { AppTheme.ApplyDarkTitleBar(this); await LoadSystemSummaryAsync(); };
         WriteLog("Program je pripravljen. Izberi opravila in klikni ZACNI.");
     }
 
     private static CheckBox NewOption(string text) => new ForgeCheckBox { Text = text, Checked = true };
+
+    private async Task LoadSystemSummaryAsync()
+    {
+        try
+        {
+            const string script = "$cs=Get-CimInstance Win32_ComputerSystem;$os=Get-CimInstance Win32_OperatingSystem;$lic=Get-CimInstance SoftwareLicensingProduct|?{$_.ApplicationID -eq '55c92734-d682-4d71-983e-d6ec3f16059f' -and $_.PartialProductKey}|sort LicenseStatus -Descending|select -First 1;$restart=(Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired') -or (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending');'{0}|{1}|{2}|{3}|{4}' -f $cs.Manufacturer,$cs.Model,$os.Caption,[math]::Round($cs.TotalPhysicalMemory/1GB),$(if($lic.LicenseStatus -eq 1){'aktiviran'}else{'ni potrjeno'});'RESTART='+$restart";
+            var result = await RunAsync("powershell.exe", ["-NoProfile", "-Command", script], false, TimeSpan.FromSeconds(30), CancellationToken.None);
+            if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
+            var lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var values = lines.FirstOrDefault()?.Split('|') ?? [];
+            var pc = values.Length >= 5 ? $"{values[0]} {values[1]}  •  {values[2]}  •  {values[3]} GB RAM  •  Windows {values[4]}" : Environment.MachineName;
+            var restart = lines.Any(x => x.Contains("RESTART=True", StringComparison.OrdinalIgnoreCase)) ? "potreben" : "ne";
+            var internet = System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable() ? "na voljo" : "ni povezave";
+            var winget = CommandExists("winget.exe") ? "pripravljen" : "manjka";
+            systemSummary.Text = pc + Environment.NewLine + $"Internet: {internet}  •  winget: {winget}  •  ponovni zagon: {restart}";
+            WriteLog("Predhodni pregled racunalnika je koncan.", "OK");
+        }
+        catch (Exception ex)
+        {
+            systemSummary.Text = "Podatkov o racunalniku ni bilo mogoce v celoti prebrati: " + ex.Message;
+            WriteLog("Predhodni pregled: " + ex.Message, "WARN");
+        }
+    }
+
+    private void SetTaskState(CheckBox box, string text, Color color)
+    {
+        if (!taskStates.TryGetValue(box, out var label)) return;
+        label.Text = text; label.ForeColor = color;
+    }
+
+    private void UpdateProgress(int completed, int total)
+    {
+        var percent = total == 0 ? 0 : completed * 100 / total;
+        progressText.Text = percent + " %";
+        progressFill.Width = progressTrack.Width * percent / 100;
+    }
 
     private async Task StartSetupAsync(CheckBox[] boxes, CheckBox selectAll)
     {
@@ -80,22 +133,31 @@ public sealed class MainForm : Form
         foreach (var box in boxes) box.Enabled = false;
         currentRun = new CancellationTokenSource();
         var failures = new List<string>();
-        var tasks = new List<(string Name, Func<CancellationToken, Task> Run)>();
-        if (chrome.Checked) tasks.Add(("Google Chrome", ct => InstallPackageAsync("Google.Chrome", "Google Chrome", ct)));
-        if (sevenZip.Checked) tasks.Add(("7-Zip", ct => InstallPackageAsync("7zip.7zip", "7-Zip", ct)));
-        if (adobe.Checked) tasks.Add(("Adobe Acrobat Reader", ct => InstallPackageAsync("Adobe.Acrobat.Reader.64-bit", "Adobe Acrobat Reader", ct)));
-        if (powerPlan.Checked) tasks.Add(("Nacrt porabe energije", SetPowerPlanAsync));
-        if (devicePower.Checked) tasks.Add(("Varcevanje naprav", DisableDevicePowerAsync));
-        if (cleanup.Checked) tasks.Add(("Odstranjevanje programov", ShowCleanupAsync));
+        var tasks = new List<(string Name, CheckBox Box, Func<CancellationToken, Task> Run)>();
+        if (chrome.Checked) tasks.Add(("Google Chrome", chrome, ct => InstallPackageAsync("Google.Chrome", "Google Chrome", ct)));
+        if (sevenZip.Checked) tasks.Add(("7-Zip", sevenZip, ct => InstallPackageAsync("7zip.7zip", "7-Zip", ct)));
+        if (adobe.Checked) tasks.Add(("Adobe Acrobat Reader", adobe, ct => InstallPackageAsync("Adobe.Acrobat.Reader.64-bit", "Adobe Acrobat Reader", ct)));
+        if (powerPlan.Checked) tasks.Add(("Nacrt porabe energije", powerPlan, SetPowerPlanAsync));
+        if (devicePower.Checked) tasks.Add(("Varcevanje naprav", devicePower, DisableDevicePowerAsync));
+        if (cleanup.Checked) tasks.Add(("Odstranjevanje programov", cleanup, ShowCleanupAsync));
+        if (windowsUpdate.Checked) tasks.Add(("Windows Update", windowsUpdate, InstallWindowsUpdatesAsync));
+        if (drivers.Checked) tasks.Add(("Pregled gonilnikov", drivers, CheckDriversAsync));
+
+        foreach (var pair in taskStates) SetTaskState(pair.Key, pair.Key.Checked ? "CAKA" : "IZPUSCENO", AppTheme.Muted);
+        UpdateProgress(0, tasks.Count);
 
         try
         {
-            foreach (var task in tasks)
+            for (var index = 0; index < tasks.Count; index++)
             {
+                var task = tasks[index];
                 currentRun.Token.ThrowIfCancellationRequested();
-                try { await task.Run(currentRun.Token); }
+                SetTaskState(task.Box, "IZVAJAM", AppTheme.AccentBright);
+                status.Text = "Izvajam: " + task.Name;
+                try { await task.Run(currentRun.Token); SetTaskState(task.Box, "USPELO", Color.FromArgb(83, 205, 137)); }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { failures.Add(task.Name); WriteLog($"{task.Name}: {ex.Message}", "ERROR"); }
+                catch (Exception ex) { failures.Add(task.Name); SetTaskState(task.Box, "NAPAKA", Color.FromArgb(239, 101, 101)); WriteLog($"{task.Name}: {ex.Message}", "ERROR"); }
+                UpdateProgress(index + 1, tasks.Count);
             }
 
             if (failures.Count == 0) { status.Text = "Vsa opravila so koncana."; WriteLog("Vsa izbrana opravila so bila uspesno koncana.", "OK"); MessageBox.Show("Racunalnik je uspesno pripravljen.", Text); }
@@ -190,7 +252,34 @@ public sealed class MainForm : Form
             if (result.ExitCode != 0) WriteLog($"Opcijska nastavitev ni podprta: powercfg {string.Join(' ', command)}", "WARN");
         }
         await RunCheckedAsync("powercfg.exe", ["/setactive", guid], false, ct);
+        await VerifyPowerSettingsAsync(guid, ct);
         WriteLog($"Nacrt je ustvarjen oziroma posodobljen in aktiviran ({guid}).", "OK");
+    }
+
+    private async Task VerifyPowerSettingsAsync(string guid, CancellationToken ct)
+    {
+        var active = await RunCheckedAsync("powercfg.exe", ["/getactivescheme"], false, ct);
+        if (!active.Output.Contains(guid, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("ReadyForge nacrt po nastavitvi ni aktiven.");
+
+        string[][] settings = [
+            ["7516b95f-f776-4464-8c53-06167f40cc99", "3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e"],
+            ["0012ee47-9041-4b5d-9b77-535fba8b1442", "6738e2c4-e8a5-4a42-b16a-e040e769756e"],
+            ["238c9fa8-0aad-41ed-83f4-97be242c8f20", "29f6c1db-86da-48c5-9fdb-f2b67b1f44da"],
+            ["238c9fa8-0aad-41ed-83f4-97be242c8f20", "9d7815a6-7ee4-497e-8888-515a05f02364"]
+        ];
+        foreach (var setting in settings)
+        {
+            var query = await RunCheckedAsync("powercfg.exe", ["/query", guid, setting[0], setting[1]], false, ct);
+            var values = Regex.Matches(query.Output, @"0x([0-9a-f]{8})", RegexOptions.IgnoreCase);
+            if (values.Count == 0 || values[0].Groups[1].Value != "00000000")
+                throw new InvalidOperationException("Ena od AC nastavitev porabe energije ni nastavljena na Nikoli.");
+        }
+
+        var fastStartup = await RunCheckedAsync("reg.exe", ["query", @"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power", "/v", "HiberbootEnabled"], false, ct);
+        if (!Regex.IsMatch(fastStartup.Output, @"HiberbootEnabled\s+REG_DWORD\s+0x0\b", RegexOptions.IgnoreCase))
+            throw new InvalidOperationException("Hiter zagon po spremembi ni izklopljen.");
+        WriteLog("Preverjeno: nacrt je aktiven, AC casovne omejitve so Nikoli in Fast Startup je izklopljen.", "OK");
     }
 
     private async Task DisableDevicePowerAsync(CancellationToken ct)
@@ -199,6 +288,38 @@ public sealed class MainForm : Form
         const string script = "$ids=@(); $ids += Get-PnpDevice -Class USB -Status OK -ErrorAction SilentlyContinue | % InstanceId; $ids += Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ? Status -ne 'Disabled' | % PnPDeviceID; $p=Get-CimInstance -Namespace root/wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop; $n=0; foreach($id in ($ids|?{$_}|sort -Unique)){ $x=$id.Replace('\\','_'); $p|?{(($_.InstanceName -like \"$id*\") -or ($_.InstanceName -like \"$x*\")) -and $_.Enable}|%{Set-CimInstance -InputObject $_ -Property @{Enable=$false} -ErrorAction Stop|Out-Null;$n++} }; Write-Output $n";
         var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, ct);
         WriteLog($"Spremenjenih power-management vnosov: {result.Output.Trim()}.", "OK");
+    }
+
+    private async Task InstallWindowsUpdatesAsync(CancellationToken ct)
+    {
+        WriteLog("Iscem Windows posodobitve; pregled lahko traja vec minut ...");
+        status.Text = "Windows Update: iskanje posodobitev ...";
+        const string script = "$s=New-Object -ComObject Microsoft.Update.Session;$r=$s.CreateUpdateSearcher().Search(\"IsInstalled=0 and IsHidden=0 and Type='Software'\");$c=New-Object -ComObject Microsoft.Update.UpdateColl;foreach($u in $r.Updates){if(-not $u.EulaAccepted){$u.AcceptEula()};[void]$c.Add($u)};if($c.Count -eq 0){'COUNT=0';exit 0};$d=$s.CreateUpdateDownloader();$d.Updates=$c;[void]$d.Download();$ready=New-Object -ComObject Microsoft.Update.UpdateColl;foreach($u in $c){if($u.IsDownloaded){[void]$ready.Add($u)}};if($ready.Count -eq 0){throw 'Posodobitev ni bilo mogoce prenesti.'};$i=$s.CreateUpdateInstaller();$i.Updates=$ready;$x=$i.Install();'COUNT='+$ready.Count;'RESULT='+$x.ResultCode;'REBOOT='+$x.RebootRequired";
+        var result = await RunAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, TimeSpan.FromMinutes(60), ct);
+        if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
+        var count = Regex.Match(result.Output, @"COUNT=(\d+)").Groups[1].Value;
+        if (count == "0") WriteLog("Windows Update: novih programskih posodobitev ni.", "OK");
+        else
+        {
+            var reboot = result.Output.Contains("REBOOT=True", StringComparison.OrdinalIgnoreCase);
+            WriteLog($"Windows Update: obdelanih posodobitev {count}. Ponovni zagon: {(reboot ? "DA" : "ne")}.", "OK");
+        }
+    }
+
+    private async Task CheckDriversAsync(CancellationToken ct)
+    {
+        WriteLog("Osvezujem naprave in preverjam manjkajoce gonilnike ...");
+        await RunAsync("pnputil.exe", ["/scan-devices"], false, TimeSpan.FromMinutes(3), ct);
+        const string script = "$x=Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue|?{$_.Status -ne 'OK'}|select FriendlyName,Class,Problem,InstanceId;if($x){$x|ConvertTo-Json -Compress}else{'NONE'}";
+        var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-Command", script], false, ct);
+        if (result.Output.Trim().Equals("NONE", StringComparison.OrdinalIgnoreCase))
+        {
+            WriteLog("Ni zaznanih naprav z manjkajocimi ali okvarjenimi gonilniki.", "OK");
+            return;
+        }
+        WriteLog("Zaznane so naprave, ki zahtevajo pregled gonilnikov: " + result.Output, "WARN");
+        if (MessageBox.Show("Zaznane so naprave z napako ali manjkajocim gonilnikom. Odprem Windows Update > Izbirne posodobitve?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            Process.Start(new ProcessStartInfo("ms-settings:windowsupdate-optionalupdates") { UseShellExecute = true });
     }
 
     private Task ShowCleanupAsync(CancellationToken ct)
