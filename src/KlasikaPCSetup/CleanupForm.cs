@@ -16,7 +16,7 @@ public sealed class CleanupForm : Form
 
     public CleanupForm()
     {
-        Text = "Pregled in odstranitev programov";
+        Text = "ReadyForge - odstranitev programov";
         ClientSize = new Size(920, 640);
         StartPosition = FormStartPosition.CenterParent;
         Font = new Font("Segoe UI", 9.5f);
@@ -39,7 +39,9 @@ public sealed class CleanupForm : Form
         grid.EnableHeadersVisualStyles = false; grid.ColumnHeadersHeight = 36; grid.RowTemplate.Height = 30;
         grid.ColumnHeadersDefaultCellStyle.BackColor = AppTheme.Charcoal; grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
         grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.5f);
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 226, 218); grid.DefaultCellStyle.SelectionForeColor = AppTheme.Charcoal;
+        grid.DefaultCellStyle.BackColor = AppTheme.Surface; grid.DefaultCellStyle.ForeColor = Color.Gainsboro;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = AppTheme.SurfaceRaised;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(35, 91, 94); grid.DefaultCellStyle.SelectionForeColor = Color.White;
         grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Remove", HeaderText = "Odstrani", FillWeight = 18 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Name", HeaderText = "Program", ReadOnly = true, FillWeight = 100 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Publisher", HeaderText = "Izdajatelj", ReadOnly = true, FillWeight = 55 });
@@ -66,8 +68,8 @@ public sealed class CleanupForm : Form
             {
                 var row = grid.Rows[grid.Rows.Add(app.Recommended, app.Name, app.Publisher, app.Version, app.Note)];
                 row.Tag = app;
-                if (app.IsOffice) { row.Cells["Remove"].ReadOnly = true; row.DefaultCellStyle.BackColor = Color.AliceBlue; }
-                if (app.Protected) row.DefaultCellStyle.BackColor = Color.FromArgb(255, 248, 220);
+                if (app.IsOffice) { row.Cells["Remove"].ReadOnly = true; row.DefaultCellStyle.BackColor = Color.FromArgb(15, 48, 55); }
+                if (app.Protected) row.DefaultCellStyle.BackColor = Color.FromArgb(62, 51, 22);
             }
             status.Text = $"Najdenih programov: {apps.Count}. Rumeno oznaceni zahtevajo posebno previdnost.";
         }
@@ -161,11 +163,11 @@ public sealed class CleanupForm : Form
             try
             {
                 var exit = await RunUninstallerAsync(item.App.UninstallCommand, removal.Token);
-                if (exit == 0 || exit == 1605 || exit == 3010) { item.Row.DefaultCellStyle.BackColor = Color.Honeydew; item.Row.Cells["Note"].Value = exit == 3010 ? "Odstranjeno - potreben restart" : "Odstranjeno"; }
-                else { failed++; item.Row.DefaultCellStyle.BackColor = Color.MistyRose; item.Row.Cells["Note"].Value = $"Napaka {exit}"; }
+                if (exit == 0 || exit == 1605 || exit == 3010) { item.Row.DefaultCellStyle.BackColor = Color.FromArgb(22, 69, 48); item.Row.Cells["Note"].Value = exit == 3010 ? "Odstranjeno - potreben restart" : "Odstranjeno"; }
+                else { failed++; item.Row.DefaultCellStyle.BackColor = Color.FromArgb(77, 35, 39); item.Row.Cells["Note"].Value = $"Napaka {exit}"; }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex) { failed++; item.Row.DefaultCellStyle.BackColor = Color.MistyRose; item.Row.Cells["Note"].Value = ex.Message; }
+            catch (Exception ex) { failed++; item.Row.DefaultCellStyle.BackColor = Color.FromArgb(77, 35, 39); item.Row.Cells["Note"].Value = ex.Message; }
         }
         status.Text = removal.IsCancellationRequested ? "Odstranjevanje je bilo preklicano." : $"Koncano. Neuspesnih: {failed}.";
         removal.Dispose(); removal = null; remove.Enabled = true; grid.Enabled = true; close.Text = "ZAPRI";
@@ -176,7 +178,7 @@ public sealed class CleanupForm : Form
         if (MessageBox.Show("To bo z Microsoftovim uradnim pomocnikom odstranilo vse različice Office, Microsoft 365, Visio, Project in jezikovne pakete. Pred nadaljevanjem zapri Word, Excel, Outlook, Teams in druge Office programe. Nadaljujem?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
 
         removal = new CancellationTokenSource(); remove.Enabled = false; removeOffice.Enabled = false; grid.Enabled = false; close.Text = "PREKLICI";
-        var workDirectory = Path.Combine(Path.GetTempPath(), "KlasikaOfficeRemoval-" + Guid.NewGuid().ToString("N"));
+        var workDirectory = Path.Combine(Path.GetTempPath(), "ReadyForgeOfficeRemoval-" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(workDirectory);
