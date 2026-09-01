@@ -126,25 +126,47 @@ public sealed class MainForm : Form
         if (match.Success) guid = match.Groups[1].Value;
         else
         {
-            var duplicate = await RunCheckedAsync("powercfg.exe", ["/duplicatescheme", "SCHEME_MIN"], false, ct);
+            // Uporabimo nespremenljivi GUID nacrta High performance, ker alias
+            // SCHEME_MIN na nekaterih OEM racunalnikih vrne Invalid Parameters.
+            var duplicate = await RunCheckedAsync("powercfg.exe", ["/duplicatescheme", "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"], false, ct);
             var guidMatch = Regex.Match(duplicate.Output, @"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", RegexOptions.IgnoreCase);
             if (!guidMatch.Success) throw new InvalidOperationException("GUID novega nacrta ni bil najden.");
             guid = guidMatch.Value;
         }
-        string[][] commands = [
-            ["/changename", guid, "Klasika - visoka ucinkovitost", "Brez spanja in varcevanja na namiznem racunalniku."],
-            ["/setacvalueindex", guid, "SUB_VIDEO", "VIDEOIDLE", "0"], ["/setacvalueindex", guid, "SUB_DISK", "DISKIDLE", "0"],
-            ["/setacvalueindex", guid, "SUB_SLEEP", "STANDBYIDLE", "0"], ["/setacvalueindex", guid, "SUB_SLEEP", "HIBERNATEIDLE", "0"],
-            ["/setacvalueindex", guid, "SUB_USB", "USBSELECTIVE", "0"], ["/setacvalueindex", guid, "SUB_PCIEXPRESS", "ASPM", "0"],
-            ["/setactive", guid], ["/hibernate", "off"] ];
-        foreach (var command in commands) await RunCheckedAsync("powercfg.exe", command, false, ct);
+
+        await RunCheckedAsync("powercfg.exe", ["/changename", guid, "Klasika - visoka ucinkovitost"], false, ct);
+        await RunCheckedAsync("powercfg.exe", ["/setactive", guid], false, ct);
+
+        // /change je na Windows 10/11 bolj zdruzljiv od lokaliziranih aliasov
+        // SUB_VIDEO, SUB_DISK in SUB_SLEEP.
+        string[][] required = [
+            ["/change", "monitor-timeout-ac", "0"],
+            ["/change", "disk-timeout-ac", "0"],
+            ["/change", "standby-timeout-ac", "0"],
+            ["/change", "hibernate-timeout-ac", "0"],
+            ["/hibernate", "off"]
+        ];
+        foreach (var command in required) await RunCheckedAsync("powercfg.exe", command, false, ct);
+
+        // Ti nastavitvi na nekaterih OEM/Modern Standby sistemih ne obstajata.
+        // Uporabimo uradne GUID-e in nepodprto nastavitev obravnavamo kot opozorilo.
+        string[][] optional = [
+            ["/setacvalueindex", guid, "2a737441-1930-4402-8d77-b2bebba308a3", "48e6b7a6-50f5-4782-a5d4-53bb8f07e226", "0"],
+            ["/setacvalueindex", guid, "501a4d13-42af-4429-9fd1-a8218c268e20", "ee12f906-d277-404b-b6da-e5fa1a576df5", "0"]
+        ];
+        foreach (var command in optional)
+        {
+            var result = await RunAsync("powercfg.exe", command, false, TimeSpan.FromMinutes(1), ct);
+            if (result.ExitCode != 0) WriteLog($"Opcijska nastavitev ni podprta: powercfg {string.Join(' ', command)}", "WARN");
+        }
+        await RunCheckedAsync("powercfg.exe", ["/setactive", guid], false, ct);
         WriteLog($"Nacrt je ustvarjen oziroma posodobljen in aktiviran ({guid}).", "OK");
     }
 
     private async Task DisableDevicePowerAsync(CancellationToken ct)
     {
         WriteLog("Izklapljam varcevanje USB in mreznih kartic ...");
-        const string script = "$ids=@(); $ids += Get-PnpDevice -Class USB -Status OK -ErrorAction SilentlyContinue | % InstanceId; $ids += Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ? Status -ne 'Disabled' | % PnPDeviceID; $p=Get-CimInstance -Namespace root/wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop; $n=0; foreach($id in ($ids|?{$_}|sort -Unique)){ $x=$id.Replace('\\','_'); $p|?{$_.InstanceName -like \"$x*\" -and $_.Enable}|%{Set-CimInstance -InputObject $_ -Property @{Enable=$false} -ErrorAction Stop|Out-Null;$n++} }; Write-Output $n";
+        const string script = "$ids=@(); $ids += Get-PnpDevice -Class USB -Status OK -ErrorAction SilentlyContinue | % InstanceId; $ids += Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ? Status -ne 'Disabled' | % PnPDeviceID; $p=Get-CimInstance -Namespace root/wmi -ClassName MSPower_DeviceEnable -ErrorAction Stop; $n=0; foreach($id in ($ids|?{$_}|sort -Unique)){ $x=$id.Replace('\\','_'); $p|?{(($_.InstanceName -like \"$id*\") -or ($_.InstanceName -like \"$x*\")) -and $_.Enable}|%{Set-CimInstance -InputObject $_ -Property @{Enable=$false} -ErrorAction Stop|Out-Null;$n++} }; Write-Output $n";
         var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, ct);
         WriteLog($"Spremenjenih power-management vnosov: {result.Output.Trim()}.", "OK");
     }
