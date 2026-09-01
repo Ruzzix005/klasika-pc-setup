@@ -90,7 +90,7 @@ internal sealed class ForgeCheckBox : CheckBox
         if (Checked)
         {
             using var checkPen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            e.Graphics.DrawLines(checkPen, [new Point(7, 19), new Point(12, 24), new Point(20, 13)]);
+            e.Graphics.DrawLines(checkPen, new Point[] { new(7, 19), new(12, 24), new(20, 13) });
         }
         TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(37, 0, Width - 39, Height), Enabled ? ForeColor : AppTheme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
     }
