@@ -30,7 +30,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "ReadyForge 2.4";
+        Text = "ReadyForge 2.5";
         ClientSize = new Size(1120, 760);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -45,7 +45,7 @@ public sealed class MainForm : Form
         var sidebar = new Panel { Location = Point.Empty, Size = new Size(218, 760), BackColor = AppTheme.Charcoal };
         var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 22), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(24, 28), Size = new Size(48, 48) };
         var brand = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 17), ForeColor = Color.White, AutoSize = true, Location = new Point(84, 31) };
-        var version = new Label { Text = "VERSION 2.4", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
+        var version = new Label { Text = "VERSION 2.5", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
         var navTitle = new Label { Text = "DELOVNI PROSTOR", Font = new Font("Segoe UI Semibold", 8), ForeColor = Color.FromArgb(92, 103, 112), AutoSize = true, Location = new Point(24, 125) };
         var activeNav = new Panel { Location = new Point(12, 151), Size = new Size(194, 46), BackColor = AppTheme.SurfaceRaised };
         var activeLine = new Panel { Location = Point.Empty, Size = new Size(3, 46), BackColor = AppTheme.Accent };
@@ -209,8 +209,15 @@ public sealed class MainForm : Form
         }
         if (result.ExitCode == InstallerHashMismatch && id == "Google.Chrome")
         {
-            WriteLog("WinGet manifest za Chrome ima napacen hash. Preklapljam na uradni Google MSI ...", "WARN");
-            await InstallChromeFromOfficialMsiAsync(ct);
+            var existingChrome = FindChromeExecutable();
+            if (existingChrome is not null)
+            {
+                var version = FileVersionInfo.GetVersionInfo(existingChrome).FileVersion ?? "neznana";
+                WriteLog($"WinGet manifest ima napacen hash, vendar je Chrome ze namescen (verzija {version}). Posodobitve bo dokoncal Google Update.", "OK");
+                return;
+            }
+            WriteLog("WinGet manifest za Chrome ima napacen hash. Preklapljam na uradni Google installer ...", "WARN");
+            await InstallChromeFromOfficialInstallerAsync(ct);
             return;
         }
         if (result.ExitCode != 0)
@@ -221,36 +228,48 @@ public sealed class MainForm : Form
         WriteLog($"{name} je pripravljen.", "OK");
     }
 
-    private async Task InstallChromeFromOfficialMsiAsync(CancellationToken ct)
+    private async Task InstallChromeFromOfficialInstallerAsync(CancellationToken ct)
     {
-        var msiPath = Path.Combine(Path.GetTempPath(), $"ReadyForge-Chrome-{Guid.NewGuid():N}.msi");
+        var installerPath = Path.Combine(Path.GetTempPath(), $"ReadyForge-Chrome-{Guid.NewGuid():N}.exe");
         try
         {
-            status.Text = "Google Chrome: prenasam uradni Google MSI ...";
+            var runningChrome = Process.GetProcessesByName("chrome");
+            if (runningChrome.Length > 0)
+                throw new InvalidOperationException("Google Chrome je odprt. Zapri vsa Chrome okna in ponovno zazeni opravilo.");
+
+            status.Text = "Google Chrome: prenasam uradni Google installer ...";
             using (var client = new HttpClient())
-            using (var response = await client.GetAsync("https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi", HttpCompletionOption.ResponseHeadersRead, ct))
+            using (var response = await client.GetAsync("https://dl.google.com/chrome/install/latest/chrome_installer.exe", HttpCompletionOption.ResponseHeadersRead, ct))
             {
                 response.EnsureSuccessStatusCode();
                 await using var source = await response.Content.ReadAsStreamAsync(ct);
-                await using var target = File.Create(msiPath);
+                await using var target = File.Create(installerPath);
                 await source.CopyToAsync(target, ct);
             }
 
-            status.Text = "Google Chrome: namescam uradni MSI ...";
-            var install = await RunAsync("msiexec.exe", ["/i", msiPath, "/qn", "/norestart"], false, TimeSpan.FromMinutes(15), ct);
-            if (install.ExitCode != 0 && install.ExitCode != 3010)
-                throw new InvalidOperationException($"Google MSI namestitev ni uspela (koda {install.ExitCode}). {install.Output}");
+            status.Text = "Google Chrome: namescam uradni Google installer ...";
+            var install = await RunAsync(installerPath, ["/silent", "/install"], false, TimeSpan.FromMinutes(15), ct);
+            if (install.ExitCode != 0)
+                throw new InvalidOperationException($"Uradna Google namestitev ni uspela (koda {install.ExitCode}). {install.Output}");
 
-            var chrome64 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe");
-            var chrome32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe");
-            if (!File.Exists(chrome64) && !File.Exists(chrome32))
-                throw new InvalidOperationException("MSI je koncal brez napake, vendar chrome.exe ni bil najden.");
-            WriteLog("Google Chrome je namescen z uradnim Google Enterprise MSI in preverjen.", "OK");
+            if (FindChromeExecutable() is null)
+                throw new InvalidOperationException("Google installer je koncal brez napake, vendar chrome.exe ni bil najden.");
+            WriteLog("Google Chrome je namescen z uradnim Google installerjem in preverjen.", "OK");
         }
         finally
         {
-            try { if (File.Exists(msiPath)) File.Delete(msiPath); } catch { }
+            try { if (File.Exists(installerPath)) File.Delete(installerPath); } catch { }
         }
+    }
+
+    private static string? FindChromeExecutable()
+    {
+        string[] paths = [
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Google", "Chrome", "Application", "chrome.exe")
+        ];
+        return paths.FirstOrDefault(File.Exists);
     }
 
     private async Task<string> DescribeWingetErrorAsync(int exitCode, CancellationToken ct)
