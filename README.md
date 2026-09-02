@@ -2,7 +2,7 @@
 
 Orodje za pripravo namiznih racunalnikov z Windows 10 ali Windows 11.
 
-Razlicica 2.3 uporablja kompaktno dashboard postavitev, uravnotezen kontrast in lastne zaobljene gumbe z odzivom ob prehodu miske.
+Razlicica 2.4 ob napaki WinGet `0x8A150011` za Chrome samodejno uporabi uradni Google Enterprise MSI in preveri dejansko namestitev.
 
 ## Prenos
 
