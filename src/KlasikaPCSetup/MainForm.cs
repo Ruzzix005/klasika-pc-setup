@@ -7,6 +7,7 @@ namespace KlasikaPCSetup;
 public sealed class MainForm : Form
 {
     private const int NoApplicableUpdate = unchecked((int)0x8A15002B);
+    private const int InstallerHashMismatch = unchecked((int)0x8A150011);
     private readonly CheckBox chrome = NewOption("Google Chrome");
     private readonly CheckBox sevenZip = NewOption("7-Zip");
     private readonly CheckBox adobe = NewOption("Adobe Acrobat Reader");
@@ -29,7 +30,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "ReadyForge 2.3";
+        Text = "ReadyForge 2.4";
         ClientSize = new Size(1120, 760);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -44,7 +45,7 @@ public sealed class MainForm : Form
         var sidebar = new Panel { Location = Point.Empty, Size = new Size(218, 760), BackColor = AppTheme.Charcoal };
         var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 22), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(24, 28), Size = new Size(48, 48) };
         var brand = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 17), ForeColor = Color.White, AutoSize = true, Location = new Point(84, 31) };
-        var version = new Label { Text = "VERSION 2.3", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
+        var version = new Label { Text = "VERSION 2.4", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
         var navTitle = new Label { Text = "DELOVNI PROSTOR", Font = new Font("Segoe UI Semibold", 8), ForeColor = Color.FromArgb(92, 103, 112), AutoSize = true, Location = new Point(24, 125) };
         var activeNav = new Panel { Location = new Point(12, 151), Size = new Size(194, 46), BackColor = AppTheme.SurfaceRaised };
         var activeLine = new Panel { Location = Point.Empty, Size = new Size(3, 46), BackColor = AppTheme.Accent };
@@ -206,8 +207,60 @@ public sealed class MainForm : Form
             status.Text = $"Namescanje: {name} - dokoncaj korake v installerju";
             result = await RunAsync("winget.exe", ["install", "--id", id, "-e", "--source", "winget", "--interactive", "--accept-package-agreements", "--accept-source-agreements"], true, TimeSpan.FromMinutes(15), ct);
         }
-        if (result.ExitCode != 0) throw new InvalidOperationException($"winget koda {result.ExitCode}. {result.Output}");
+        if (result.ExitCode == InstallerHashMismatch && id == "Google.Chrome")
+        {
+            WriteLog("WinGet manifest za Chrome ima napacen hash. Preklapljam na uradni Google MSI ...", "WARN");
+            await InstallChromeFromOfficialMsiAsync(ct);
+            return;
+        }
+        if (result.ExitCode != 0)
+        {
+            var description = await DescribeWingetErrorAsync(result.ExitCode, ct);
+            throw new InvalidOperationException($"winget koda {result.ExitCode} (0x{unchecked((uint)result.ExitCode):X8}): {description} {result.Output}".Trim());
+        }
         WriteLog($"{name} je pripravljen.", "OK");
+    }
+
+    private async Task InstallChromeFromOfficialMsiAsync(CancellationToken ct)
+    {
+        var msiPath = Path.Combine(Path.GetTempPath(), $"ReadyForge-Chrome-{Guid.NewGuid():N}.msi");
+        try
+        {
+            status.Text = "Google Chrome: prenasam uradni Google MSI ...";
+            using (var client = new HttpClient())
+            using (var response = await client.GetAsync("https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi", HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                response.EnsureSuccessStatusCode();
+                await using var source = await response.Content.ReadAsStreamAsync(ct);
+                await using var target = File.Create(msiPath);
+                await source.CopyToAsync(target, ct);
+            }
+
+            status.Text = "Google Chrome: namescam uradni MSI ...";
+            var install = await RunAsync("msiexec.exe", ["/i", msiPath, "/qn", "/norestart"], false, TimeSpan.FromMinutes(15), ct);
+            if (install.ExitCode != 0 && install.ExitCode != 3010)
+                throw new InvalidOperationException($"Google MSI namestitev ni uspela (koda {install.ExitCode}). {install.Output}");
+
+            var chrome64 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe");
+            var chrome32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe");
+            if (!File.Exists(chrome64) && !File.Exists(chrome32))
+                throw new InvalidOperationException("MSI je koncal brez napake, vendar chrome.exe ni bil najden.");
+            WriteLog("Google Chrome je namescen z uradnim Google Enterprise MSI in preverjen.", "OK");
+        }
+        finally
+        {
+            try { if (File.Exists(msiPath)) File.Delete(msiPath); } catch { }
+        }
+    }
+
+    private async Task<string> DescribeWingetErrorAsync(int exitCode, CancellationToken ct)
+    {
+        try
+        {
+            var result = await RunAsync("winget.exe", ["error", $"0x{unchecked((uint)exitCode):X8}"], false, TimeSpan.FromSeconds(20), ct);
+            return string.IsNullOrWhiteSpace(result.Output) ? "Neznana WinGet napaka." : result.Output;
+        }
+        catch { return "Neznana WinGet napaka."; }
     }
 
     private async Task SetPowerPlanAsync(CancellationToken ct)
