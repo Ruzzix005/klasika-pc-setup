@@ -1,11 +1,17 @@
+using Microsoft.Win32;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace KlasikaPCSetup;
 
 public sealed class MainForm : Form
 {
+    private static readonly IntPtr HwndBroadcast = new(0xffff);
+    private const uint WmSettingChange = 0x001A;
+    private const uint SmtoAbortIfHung = 0x0002;
     private const int NoApplicableUpdate = unchecked((int)0x8A15002B);
     private const int InstallerHashMismatch = unchecked((int)0x8A150011);
     private readonly CheckBox chrome = NewOption("Google Chrome");
@@ -14,8 +20,10 @@ public sealed class MainForm : Form
     private readonly CheckBox powerPlan = NewOption("Visoka ucinkovitost in Fast Startup");
     private readonly CheckBox devicePower = NewOption("USB in mrezne kartice");
     private readonly CheckBox cleanup = NewOption("Odstranjevanje programov");
-    private readonly CheckBox windowsUpdate = NewOption("Windows Update");
-    private readonly CheckBox drivers = NewOption("Pregled gonilnikov");
+    private readonly CheckBox taskbar = NewOption("Pocisti opravilno vrstico");
+    private readonly CheckBox defaultApps = NewOption("Privzete aplikacije: Chrome + Adobe");
+    private readonly Button windowsUpdateShortcut = new ForgeButton { Text = "WINDOWS UPDATE  ↗", Width = 148, Height = 34 };
+    private readonly Button driverSupportShortcut = new ForgeButton { Text = "OEM GONILNIKI  ↗", Width = 152, Height = 34, Enabled = false };
     private readonly RichTextBox log = new() { ReadOnly = true, BackColor = Color.FromArgb(10, 14, 18), ForeColor = Color.FromArgb(218, 225, 229), BorderStyle = BorderStyle.None, Font = new Font("Consolas", 9.5f) };
     private readonly Label status = new() { Text = "Pripravljeno", AutoSize = true, ForeColor = AppTheme.Muted };
     private readonly Button start = new ForgeButton { Text = "ZAČNI   →", Width = 158, Height = 46 };
@@ -27,10 +35,11 @@ public sealed class MainForm : Form
     private readonly Dictionary<CheckBox, Label> taskStates = [];
     private CancellationTokenSource? currentRun;
     private readonly string logPath;
+    private string detectedManufacturer = "";
 
     public MainForm()
     {
-        Text = "ReadyForge 2.5";
+        Text = "ReadyForge 2.6";
         ClientSize = new Size(1120, 760);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -45,7 +54,7 @@ public sealed class MainForm : Form
         var sidebar = new Panel { Location = Point.Empty, Size = new Size(218, 760), BackColor = AppTheme.Charcoal };
         var logoTile = new Label { Text = "R", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Black", 22), ForeColor = Color.White, BackColor = AppTheme.Accent, Location = new Point(24, 28), Size = new Size(48, 48) };
         var brand = new Label { Text = "ReadyForge", Font = new Font("Segoe UI Semibold", 17), ForeColor = Color.White, AutoSize = true, Location = new Point(84, 31) };
-        var version = new Label { Text = "VERSION 2.5", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
+        var version = new Label { Text = "VERSION 2.6", Font = new Font("Segoe UI Semibold", 8), ForeColor = AppTheme.AccentBright, AutoSize = true, Location = new Point(86, 61) };
         var navTitle = new Label { Text = "DELOVNI PROSTOR", Font = new Font("Segoe UI Semibold", 8), ForeColor = Color.FromArgb(92, 103, 112), AutoSize = true, Location = new Point(24, 125) };
         var activeNav = new Panel { Location = new Point(12, 151), Size = new Size(194, 46), BackColor = AppTheme.SurfaceRaised };
         var activeLine = new Panel { Location = Point.Empty, Size = new Size(3, 46), BackColor = AppTheme.Accent };
@@ -69,7 +78,7 @@ public sealed class MainForm : Form
         systemCard.Controls.AddRange([systemBadge, systemTitle, systemSummary]);
 
         var groupTitle = new Label { Text = "Opravila", Font = new Font("Segoe UI Semibold", 16), ForeColor = Color.White, AutoSize = true, Location = new Point(252, 211) };
-        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup, windowsUpdate, drivers };
+        var boxes = new[] { chrome, sevenZip, adobe, powerPlan, devicePower, cleanup, taskbar, defaultApps };
         for (var i = 0; i < boxes.Length; i++)
         {
             var column = i % 2; var row = i / 2;
@@ -78,6 +87,12 @@ public sealed class MainForm : Form
             var state = new Label { Text = "CAKA", Font = new Font("Segoe UI Semibold", 7.5f), ForeColor = AppTheme.Muted, TextAlign = ContentAlignment.MiddleRight, Location = new Point(316, 15), Size = new Size(70, 24) };
             taskStates[boxes[i]] = state; tile.Controls.Add(state); Controls.Add(tile);
         }
+
+        windowsUpdateShortcut.Location = new Point(598, 203);
+        driverSupportShortcut.Location = new Point(755, 203);
+        AppTheme.SecondaryButton(windowsUpdateShortcut); AppTheme.SecondaryButton(driverSupportShortcut);
+        windowsUpdateShortcut.Click += (_, _) => OpenExternal("ms-settings:windowsupdate", "Windows Update");
+        driverSupportShortcut.Click += (_, _) => OpenManufacturerSupport();
 
         var selectAll = new ForgeCheckBox { Text = "Izberi vse", Checked = true, Font = new Font("Segoe UI Semibold", 10), ForeColor = AppTheme.AccentBright, Location = new Point(940, 207), Width = 145 };
         selectAll.CheckedChanged += (_, _) => { foreach (var box in boxes) box.Checked = selectAll.Checked; };
@@ -97,7 +112,7 @@ public sealed class MainForm : Form
         cancel.Click += (_, _) => { cancel.Enabled = false; status.Text = "Preklicujem ..."; currentRun?.Cancel(); };
         footer.Controls.AddRange([status, cancel, start]);
 
-        Controls.AddRange([sidebar, pageTitle, pageSubtitle, systemCard, groupTitle, selectAll, outputCard, footer]);
+        Controls.AddRange([sidebar, pageTitle, pageSubtitle, systemCard, groupTitle, windowsUpdateShortcut, driverSupportShortcut, selectAll, outputCard, footer]);
         Shown += async (_, _) => { AppTheme.ApplyDarkTitleBar(this); await LoadSystemSummaryAsync(); };
         WriteLog("Program je pripravljen. Izberi opravila in klikni ZACNI.");
     }
@@ -113,6 +128,8 @@ public sealed class MainForm : Form
             if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
             var lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var values = lines.FirstOrDefault()?.Split('|') ?? [];
+            detectedManufacturer = values.Length >= 1 ? values[0].Trim() : "";
+            UpdateDriverSupportButton();
             var pc = values.Length >= 5 ? $"{values[0]} {values[1]}  •  {values[2]}  •  {values[3]} GB RAM  •  Windows {values[4]}" : Environment.MachineName;
             var restart = lines.Any(x => x.Contains("RESTART=True", StringComparison.OrdinalIgnoreCase)) ? "potreben" : "ne";
             var internet = System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable() ? "na voljo" : "ni povezave";
@@ -122,6 +139,8 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
+            detectedManufacturer = "";
+            UpdateDriverSupportButton();
             systemSummary.Text = "Podatkov o racunalniku ni bilo mogoce v celoti prebrati: " + ex.Message;
             WriteLog("Predhodni pregled: " + ex.Message, "WARN");
         }
@@ -151,11 +170,11 @@ public sealed class MainForm : Form
         if (chrome.Checked) tasks.Add(("Google Chrome", chrome, ct => InstallPackageAsync("Google.Chrome", "Google Chrome", ct)));
         if (sevenZip.Checked) tasks.Add(("7-Zip", sevenZip, ct => InstallPackageAsync("7zip.7zip", "7-Zip", ct)));
         if (adobe.Checked) tasks.Add(("Adobe Acrobat Reader", adobe, ct => InstallPackageAsync("Adobe.Acrobat.Reader.64-bit", "Adobe Acrobat Reader", ct)));
+        if (defaultApps.Checked) tasks.Add(("Privzete aplikacije", defaultApps, ConfigureDefaultAppsAsync));
         if (powerPlan.Checked) tasks.Add(("Nacrt porabe energije", powerPlan, SetPowerPlanAsync));
         if (devicePower.Checked) tasks.Add(("Varcevanje naprav", devicePower, DisableDevicePowerAsync));
         if (cleanup.Checked) tasks.Add(("Odstranjevanje programov", cleanup, ShowCleanupAsync));
-        if (windowsUpdate.Checked) tasks.Add(("Windows Update", windowsUpdate, InstallWindowsUpdatesAsync));
-        if (drivers.Checked) tasks.Add(("Pregled gonilnikov", drivers, CheckDriversAsync));
+        if (taskbar.Checked) tasks.Add(("Opravilna vrstica", taskbar, ConfigureTaskbarAsync));
 
         foreach (var pair in taskStates) SetTaskState(pair.Key, pair.Key.Checked ? "CAKA" : "IZPUSCENO", AppTheme.Muted);
         UpdateProgress(0, tasks.Count);
@@ -375,36 +394,207 @@ public sealed class MainForm : Form
         WriteLog($"Spremenjenih power-management vnosov: {result.Output.Trim()}.", "OK");
     }
 
-    private async Task InstallWindowsUpdatesAsync(CancellationToken ct)
+    private async Task ConfigureTaskbarAsync(CancellationToken ct)
     {
-        WriteLog("Iscem Windows posodobitve; pregled lahko traja vec minut ...");
-        status.Text = "Windows Update: iskanje posodobitev ...";
-        const string script = "$s=New-Object -ComObject Microsoft.Update.Session;$r=$s.CreateUpdateSearcher().Search(\"IsInstalled=0 and IsHidden=0 and Type='Software'\");$c=New-Object -ComObject Microsoft.Update.UpdateColl;foreach($u in $r.Updates){if(-not $u.EulaAccepted){$u.AcceptEula()};[void]$c.Add($u)};if($c.Count -eq 0){'COUNT=0';exit 0};$d=$s.CreateUpdateDownloader();$d.Updates=$c;[void]$d.Download();$ready=New-Object -ComObject Microsoft.Update.UpdateColl;foreach($u in $c){if($u.IsDownloaded){[void]$ready.Add($u)}};if($ready.Count -eq 0){throw 'Posodobitev ni bilo mogoce prenesti.'};$i=$s.CreateUpdateInstaller();$i.Updates=$ready;$x=$i.Install();'COUNT='+$ready.Count;'RESULT='+$x.ResultCode;'REBOOT='+$x.RebootRequired";
-        var result = await RunAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, TimeSpan.FromMinutes(60), ct);
-        if (result.ExitCode != 0) throw new InvalidOperationException(result.Output);
-        var count = Regex.Match(result.Output, @"COUNT=(\d+)").Groups[1].Value;
-        if (count == "0") WriteLog("Windows Update: novih programskih posodobitev ni.", "OK");
-        else
+        WriteLog("Izklapljam Pregled opravil, Pripomocke in Nadaljuj. Iskalnega polja ne spreminjam ...");
+        const string script = "$u=(Get-CimInstance Win32_ComputerSystem).UserName;if([string]::IsNullOrWhiteSpace($u)){$u=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name};$sid=(New-Object System.Security.Principal.NTAccount($u)).Translate([System.Security.Principal.SecurityIdentifier]).Value;$adv=\"Registry::HKEY_USERS\\$sid\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\";$resume=\"Registry::HKEY_USERS\\$sid\\Software\\Microsoft\\Windows\\CurrentVersion\\CrossDeviceResume\\Configuration\";New-Item $adv -Force|Out-Null;New-ItemProperty $adv -Name ShowTaskViewButton -PropertyType DWord -Value 0 -Force|Out-Null;New-ItemProperty $adv -Name TaskbarDa -PropertyType DWord -Value 0 -Force|Out-Null;New-Item $resume -Force|Out-Null;New-ItemProperty $resume -Name IsResumeAllowed -PropertyType DWord -Value 0 -Force|Out-Null;\"USER=$u\";\"SID=$sid\"";
+        var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], false, ct);
+        NotifyShellSettingsChanged();
+        WriteLog("Pregled opravil, Pripomocki in Nadaljuj so izklopljeni za prijavljenega uporabnika. Iskanje je ostalo nespremenjeno.", "OK");
+        if (!result.Output.Contains("SID=S-1-", StringComparison.OrdinalIgnoreCase))
+            WriteLog("Windows ni vrnil SID-a prijavljenega uporabnika; spremembe preveri po naslednji prijavi.", "WARN");
+    }
+
+    private async Task ConfigureDefaultAppsAsync(CancellationToken ct)
+    {
+        if (FindChromeExecutable() is null)
+            throw new InvalidOperationException("Google Chrome ni namescen. Najprej izberi namestitev Chroma.");
+        if (FindAdobeExecutable() is null)
+            throw new InvalidOperationException("Adobe Acrobat Reader ni namescen. Najprej izberi namestitev Adobe Readerja.");
+
+        var chromeProgId = FindRegisteredProgId(["Google Chrome"], "FileAssociations", ".html") ??
+                           (ProgIdExists("ChromeHTML") ? "ChromeHTML" : null) ??
+                           throw new InvalidOperationException("Registracija Google Chroma za privzete aplikacije ni bila najdena.");
+        var adobeProgId = FindRegisteredProgId(["Adobe Acrobat Reader", "Adobe Acrobat"], "FileAssociations", ".pdf") ??
+                          (ProgIdExists("AcroExch.Document.DC") ? "AcroExch.Document.DC" : null) ??
+                          throw new InvalidOperationException("Registracija Adobe Readerja za datoteke PDF ni bila najdena.");
+
+        WriteLog($"Pripravljam privzete povezave: Chrome ({chromeProgId}) in Adobe ({adobeProgId}) ...");
+        var xmlPath = Path.Combine(Path.GetTempPath(), $"ReadyForge-DefaultApps-{Guid.NewGuid():N}.xml");
+        try
         {
-            var reboot = result.Output.Contains("REBOOT=True", StringComparison.OrdinalIgnoreCase);
-            WriteLog($"Windows Update: obdelanih posodobitev {count}. Ponovni zagon: {(reboot ? "DA" : "ne")}.", "OK");
+            var export = await RunAsync("dism.exe", ["/Online", $"/Export-DefaultAppAssociations:{xmlPath}"], false, TimeSpan.FromMinutes(5), ct);
+            if (export.ExitCode != 0 || !File.Exists(xmlPath))
+                throw new InvalidOperationException($"Izvoz obstojecih povezav ni uspel (DISM {export.ExitCode}): {export.Output}");
+
+            var document = XDocument.Load(xmlPath);
+            var root = document.Root ?? throw new InvalidOperationException("DISM je ustvaril neveljavno XML datoteko.");
+            string[] chromeIdentifiers = [".htm", ".html", ".mhtml", ".shtml", ".svg", ".xht", ".xhtml", "google-chrome", "http", "https"];
+            foreach (var identifier in chromeIdentifiers)
+                UpsertAssociation(root, identifier, chromeProgId, "Google Chrome");
+            UpsertAssociation(root, ".pdf", adobeProgId, "Adobe Acrobat Reader");
+            document.Save(xmlPath);
+
+            var import = await RunAsync("dism.exe", ["/Online", $"/Import-DefaultAppAssociations:{xmlPath}"], false, TimeSpan.FromMinutes(5), ct);
+            if (import.ExitCode != 0)
+                throw new InvalidOperationException($"Uvoz privzetih povezav ni uspel (DISM {import.ExitCode}): {import.Output}");
+            WriteLog("Sistemske privzete povezave so shranjene za nove uporabniske profile.", "OK");
+        }
+        finally { try { if (File.Exists(xmlPath)) File.Delete(xmlPath); } catch { } }
+
+        var sid = await GetInteractiveUserSidAsync(ct);
+        if (DefaultAssociationsMatch(sid, chromeProgId, adobeProgId))
+        {
+            WriteLog("Preverjeno: Chrome in Adobe sta ze pravilno nastavljena za prijavljenega uporabnika.", "OK");
+            return;
+        }
+
+        OpenExternal("ms-settings:defaultapps", "Privzete aplikacije");
+        var confirmation = MessageBox.Show(
+            "Windows zaradi varnosti ne dovoli tihega prevzema privzetih aplikacij za obstojeci profil.\n\n" +
+            "V odprtih nastavitvah:\n" +
+            "1. Izberi Google Chrome in klikni NASTAVI PRIVZETO.\n" +
+            "2. Nastavi .pdf na Adobe Acrobat Reader.\n" +
+            "3. .webp pusti pri Fotografijah in MAILTO pri Outlooku.\n\n" +
+            "Ko koncas, se vrni sem in klikni DA za preverjanje.",
+            Text, MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+        if (confirmation != DialogResult.Yes)
+            throw new InvalidOperationException("Uporabnik ni dokoncal potrditve privzetih aplikacij.");
+        if (!DefaultAssociationsMatch(sid, chromeProgId, adobeProgId))
+            throw new InvalidOperationException("Windows povezave se niso pravilne. Ponovi nastavitev Chroma in nato .pdf nastavi na Adobe Reader.");
+        WriteLog("Preverjeno: spletne vrste odpira Chrome, PDF pa Adobe Reader.", "OK");
+    }
+
+    private static void UpsertAssociation(XElement root, string identifier, string progId, string applicationName)
+    {
+        var association = root.Elements().FirstOrDefault(x =>
+            x.Name.LocalName.Equals("Association", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals((string?)x.Attribute("Identifier"), identifier, StringComparison.OrdinalIgnoreCase));
+        if (association is null)
+        {
+            association = new XElement(root.GetDefaultNamespace() + "Association");
+            root.Add(association);
+        }
+        association.SetAttributeValue("Identifier", identifier);
+        association.SetAttributeValue("ProgId", progId);
+        association.SetAttributeValue("ApplicationName", applicationName);
+    }
+
+    private static string? FindRegisteredProgId(string[] applicationNames, string associationGroup, string identifier)
+    {
+        var locations = new[] {
+            (RegistryHive.LocalMachine, RegistryView.Registry64), (RegistryHive.LocalMachine, RegistryView.Registry32),
+            (RegistryHive.CurrentUser, RegistryView.Registry64), (RegistryHive.CurrentUser, RegistryView.Registry32)
+        };
+        foreach (var wantedName in applicationNames)
+        foreach (var (hive, view) in locations)
+        {
+            using var root = RegistryKey.OpenBaseKey(hive, view);
+            using var registered = root.OpenSubKey(@"SOFTWARE\RegisteredApplications");
+            if (registered is null) continue;
+            var valueName = registered.GetValueNames().FirstOrDefault(x => x.Equals(wantedName, StringComparison.OrdinalIgnoreCase)) ??
+                            registered.GetValueNames().FirstOrDefault(x => x.Contains(wantedName, StringComparison.OrdinalIgnoreCase));
+            if (valueName is null || registered.GetValue(valueName) is not string capabilitiesPath) continue;
+            using var associations = root.OpenSubKey(capabilitiesPath.TrimEnd('\\') + "\\" + associationGroup);
+            var progId = associations?.GetValue(identifier)?.ToString();
+            if (!string.IsNullOrWhiteSpace(progId)) return progId.Trim();
+        }
+        return null;
+    }
+
+    private static bool ProgIdExists(string progId)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey(progId);
+        return key is not null;
+    }
+
+    private async Task<string> GetInteractiveUserSidAsync(CancellationToken ct)
+    {
+        const string script = "$u=(Get-CimInstance Win32_ComputerSystem).UserName;if([string]::IsNullOrWhiteSpace($u)){$u=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name};(New-Object System.Security.Principal.NTAccount($u)).Translate([System.Security.Principal.SecurityIdentifier]).Value";
+        var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-Command", script], false, ct);
+        var match = Regex.Match(result.Output, @"S-1-5-(?:\d+-)+\d+");
+        return match.Success ? match.Value : throw new InvalidOperationException("SID prijavljenega uporabnika ni bil najden.");
+    }
+
+    private static bool DefaultAssociationsMatch(string sid, string chromeProgId, string adobeProgId)
+    {
+        string[] fileTypes = [".htm", ".html", ".mhtml", ".shtml", ".svg", ".xht", ".xhtml"];
+        string[] protocols = ["google-chrome", "http", "https"];
+        return fileTypes.All(x => ReadUserChoice(sid, $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{x}\UserChoice")
+                                      .Equals(chromeProgId, StringComparison.OrdinalIgnoreCase)) &&
+               protocols.All(x => ReadUserChoice(sid, $@"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\{x}\UserChoice")
+                                      .Equals(chromeProgId, StringComparison.OrdinalIgnoreCase)) &&
+               ReadUserChoice(sid, @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice")
+                   .Equals(adobeProgId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadUserChoice(string sid, string path)
+    {
+        using var key = Registry.Users.OpenSubKey($@"{sid}\{path}");
+        return key?.GetValue("ProgId")?.ToString()?.Trim() ?? "";
+    }
+
+    private static string? FindAdobeExecutable()
+    {
+        string[] paths = [
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Adobe", "Acrobat DC", "Acrobat", "Acrobat.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Adobe", "Acrobat Reader DC", "Reader", "AcroRd32.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Adobe", "Acrobat Reader DC", "Reader", "AcroRd32.exe")
+        ];
+        return paths.FirstOrDefault(File.Exists);
+    }
+
+    private void UpdateDriverSupportButton()
+    {
+        var support = GetManufacturerSupport();
+        driverSupportShortcut.Text = support.ButtonText;
+        driverSupportShortcut.Enabled = true;
+    }
+
+    private void OpenManufacturerSupport()
+    {
+        var support = GetManufacturerSupport();
+        OpenExternal(support.Target, support.Description);
+    }
+
+    private (string ButtonText, string Description, string Target) GetManufacturerSupport()
+    {
+        var manufacturer = detectedManufacturer;
+        if (manufacturer.Contains("Dell", StringComparison.OrdinalIgnoreCase))
+            return ("DELL GONILNIKI  ↗", "Dell Support", "https://www.dell.com/support/home");
+        if (manufacturer.Equals("HP", StringComparison.OrdinalIgnoreCase) || manufacturer.Contains("Hewlett", StringComparison.OrdinalIgnoreCase))
+            return ("HP SUPPORT  ↗", "HP Support Assistant", "https://support.hp.com/help/hp-support-assistant");
+        if (manufacturer.Contains("Lenovo", StringComparison.OrdinalIgnoreCase))
+            return ("LENOVO VANTAGE  ↗", "Lenovo Vantage", "https://www.lenovo.com/software/vantage/");
+        if (manufacturer.Contains("ASUS", StringComparison.OrdinalIgnoreCase) || manufacturer.Contains("ASUSTeK", StringComparison.OrdinalIgnoreCase))
+            return ("MYASUS  ↗", "MyASUS", "https://www.asus.com/support/myasus-deeplink/");
+        if (manufacturer.Contains("Acer", StringComparison.OrdinalIgnoreCase))
+            return ("ACER SUPPORT  ↗", "Acer Drivers and Manuals", "https://www.acer.com/support/drivers-and-manuals");
+        if (manufacturer.Contains("MSI", StringComparison.OrdinalIgnoreCase) || manufacturer.Contains("Micro-Star", StringComparison.OrdinalIgnoreCase))
+            return ("MSI CENTER  ↗", "MSI Center", "https://www.msi.com/Landing/MSI-Center");
+        if (manufacturer.Contains("Microsoft", StringComparison.OrdinalIgnoreCase))
+            return ("SURFACE SUPPORT  ↗", "Microsoft Surface Support", "https://support.microsoft.com/surface");
+        return ("OEM GONILNIKI  ↗", "Windows izbirne posodobitve", "ms-settings:windowsupdate-optionalupdates");
+    }
+
+    private void OpenExternal(string target, string description)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+            WriteLog($"Odpiram: {description}.", "OK");
+        }
+        catch (Exception ex)
+        {
+            WriteLog($"{description} ni bilo mogoce odpreti: {ex.Message}", "ERROR");
+            MessageBox.Show($"Ni bilo mogoce odpreti: {description}.\n\n{ex.Message}", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
-    private async Task CheckDriversAsync(CancellationToken ct)
+    private static void NotifyShellSettingsChanged()
     {
-        WriteLog("Osvezujem naprave in preverjam manjkajoce gonilnike ...");
-        await RunAsync("pnputil.exe", ["/scan-devices"], false, TimeSpan.FromMinutes(3), ct);
-        const string script = "$x=Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue|?{$_.Status -ne 'OK'}|select FriendlyName,Class,Problem,InstanceId;if($x){$x|ConvertTo-Json -Compress}else{'NONE'}";
-        var result = await RunCheckedAsync("powershell.exe", ["-NoProfile", "-Command", script], false, ct);
-        if (result.Output.Trim().Equals("NONE", StringComparison.OrdinalIgnoreCase))
-        {
-            WriteLog("Ni zaznanih naprav z manjkajocimi ali okvarjenimi gonilniki.", "OK");
-            return;
-        }
-        WriteLog("Zaznane so naprave, ki zahtevajo pregled gonilnikov: " + result.Output, "WARN");
-        if (MessageBox.Show("Zaznane so naprave z napako ali manjkajocim gonilnikom. Odprem Windows Update > Izbirne posodobitve?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
-            Process.Start(new ProcessStartInfo("ms-settings:windowsupdate-optionalupdates") { UseShellExecute = true });
+        _ = SendMessageTimeout(HwndBroadcast, WmSettingChange, IntPtr.Zero, "TraySettings", SmtoAbortIfHung, 2000, out _);
+        _ = SendMessageTimeout(HwndBroadcast, WmSettingChange, IntPtr.Zero, "Policy", SmtoAbortIfHung, 2000, out _);
     }
 
     private Task ShowCleanupAsync(CancellationToken ct)
@@ -454,6 +644,9 @@ public sealed class MainForm : Form
         File.AppendAllText(logPath, line + Environment.NewLine, Encoding.UTF8);
         log.AppendText(line + Environment.NewLine); log.SelectionStart = log.TextLength; log.ScrollToCaret();
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint message, IntPtr wParam, string lParam, uint flags, uint timeout, out IntPtr result);
 
     private sealed record ProcessResult(int ExitCode, string Output);
 }
