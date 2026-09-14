@@ -2,7 +2,7 @@
 
 Orodje za pripravo namiznih racunalnikov z Windows 10 ali Windows 11.
 
-Razlicica 2.5 ob napaki WinGet `0x8A150011` najprej zazna obstojeco namestitev Chroma, sicer pa uporabi uradni Google EXE installer in preveri rezultat.
+Razlicica 2.6 doda pripravo opravilne vrstice, vodeno nastavitev privzetih aplikacij ter hitra gumba za Windows Update in uradno podporo proizvajalca racunalnika.
 
 ## Prenos
 
@@ -20,14 +20,17 @@ Program zahteva skrbniske pravice. Ker EXE ni digitalno podpisan s placljivim co
 - izklop hitrega zagona (Fast Startup),
 - izklop USB selective suspend in PCIe Link State Power Management,
 - izklop varcevanja na USB in aktivnih fizicnih mreznih karticah,
-- dnevnik v `C:\ProgramData\ReadyForge\Logs`.
+- dnevnik v `C:\ProgramData\ReadyForge\Logs`,
 - pregled istega seznama kot `Nadzorna plosca > Programi in funkcije`,
-- rocna izbira programov za odstranitev z opozorili za gonilnike in OEM updaterje.
+- rocna izbira programov za odstranitev z opozorili za gonilnike in OEM updaterje,
 - predhodni pregled modela, Windows, RAM-a, aktivacije, interneta in stanja ponovnega zagona,
 - prikaz stanja vsakega opravila in skupnega napredka,
 - preverjanje aktivnega nacrta, nastavitev `Nikoli` in izklopa Fast Startup,
-- iskanje in namestitev Windows posodobitev,
-- pregled naprav z manjkajocimi ali okvarjenimi gonilniki.
+- izklop gumba Pregled opravil, Pripomockov in funkcije Nadaljuj brez spreminjanja iskalnega polja,
+- sistemske privzete povezave za Chrome (`.htm`, `.html`, `.mhtml`, `.shtml`, `.svg`, `.xht`, `.xhtml`, HTTP in HTTPS) ter Adobe Reader (`.pdf`),
+- preverjanje povezav za trenutnega uporabnika in odprtje Windows nastavitev, kadar je zaradi Windows zascite potrebna rocna potrditev,
+- gumb za neposreden dostop do Windows Update,
+- zaznavanje proizvajalca in gumb za Dell, HP, Lenovo, ASUS, Acer, MSI ali Microsoft Surface podporo za gonilnike.
 
 ## Build
 
